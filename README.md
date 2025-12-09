@@ -43,44 +43,43 @@ The project was built following Clean Architecture principles and separation of 
 | **Testing** | xUnit / Cypress | Unit tests (Business Logic) and E2E |
 | **Infra** | Docker | Containerization for development |
 ---
-
 graph TD
-    %% Actors
-    User((Employee/HR))
+    %% Atores
+    User((Colaborador/RH))
     
     %% Frontend
     subgraph Client [Frontend SPA]
         React[React App]
-        GPS[Browser Geo API]
+        GPS[Navegador API Geo]
     end
 
     %% Backend
     subgraph Server [Backend API]
         API[.NET 8 Web API]
         Auth[JWT Service]
-        Calc[CLT/Labor Engine]
+        Calc[Engine CLT]
     end
 
-    %% Data
-    subgraph Data [Persistence & Cache]
+    %% Dados
+    subgraph Data [Persistência & Cache]
         Redis[(Redis Cache)]
         Postgres[(PostgreSQL)]
         Storage[Blob Storage]
     end
 
-    %% Flows
+    %% Fluxos
     User --> React
-    React -- 1. Coordinates --> GPS
+    React -- 1. Coordenadas --> GPS
     React -- 2. HTTPS Request --> API
     
-    API -- 3. Check Cache/Lock --> Redis
-    API -- 4. Persist Data --> Postgres
-    API -- 5. Save Files --> Storage
+    API -- 3. Verifica Cache/Lock --> Redis
+    API -- 4. Persiste Dados --> Postgres
+    API -- 5. Salva Atestado --> Storage
     
     Redis -.-> API
     Postgres -.-> API
     
-    %% Styling
+    %% Estilização
     style Redis fill:#ffcccc,stroke:#ff0000,stroke-width:2px
     style Postgres fill:#ccddff,stroke:#0066cc,stroke-width:2px
     style API fill:#d9d2e9,stroke:#674ea7,stroke-width:2px

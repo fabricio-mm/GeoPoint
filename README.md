@@ -30,15 +30,60 @@ Complete time tracking system for hybrid work (Home Office/On-site). Built with 
 
 The project was built following Clean Architecture principles and separation of concerns.
 
+## 🛠️ Tech Stack
+
+The project was built following Clean Architecture principles and separation of concerns.
+
 | Layer | Technology | Details |
 | :--- | :--- | :--- |
-| **Frontend** | React.js | SPA, Hooks, Context API, TailwindCSS (suggested) |
+| **Frontend** | React.js | SPA, Hooks, Context API, TailwindCSS |
 | **Backend** | C# .NET 8 | Web API, Entity Framework Core |
+| **Cache** | **Redis** | Distributed cache for performance and idempotency control |
 | **Database** | PostgreSQL | Relational, usage of JSONB and Geographic Types |
 | **Testing** | xUnit / Cypress | Unit tests (Business Logic) and E2E |
 | **Infra** | Docker | Containerization for development |
-
 ---
+
+graph TD
+    %% Actors
+    User((Employee/HR))
+    
+    %% Frontend
+    subgraph Client [Frontend SPA]
+        React[React App]
+        GPS[Browser Geo API]
+    end
+
+    %% Backend
+    subgraph Server [Backend API]
+        API[.NET 8 Web API]
+        Auth[JWT Service]
+        Calc[CLT/Labor Engine]
+    end
+
+    %% Data
+    subgraph Data [Persistence & Cache]
+        Redis[(Redis Cache)]
+        Postgres[(PostgreSQL)]
+        Storage[Blob Storage]
+    end
+
+    %% Flows
+    User --> React
+    React -- 1. Coordinates --> GPS
+    React -- 2. HTTPS Request --> API
+    
+    API -- 3. Check Cache/Lock --> Redis
+    API -- 4. Persist Data --> Postgres
+    API -- 5. Save Files --> Storage
+    
+    Redis -.-> API
+    Postgres -.-> API
+    
+    %% Styling
+    style Redis fill:#ffcccc,stroke:#ff0000,stroke-width:2px
+    style Postgres fill:#ccddff,stroke:#0066cc,stroke-width:2px
+    style API fill:#d9d2e9,stroke:#674ea7,stroke-width:2px
 
 ## 🗂️ Data Modeling
 
@@ -47,7 +92,7 @@ The database was designed for high integrity and auditing. Below is a simplified
 ```mermaid
 erDiagram
     %% ---------------------------------------------------------
-    %% TABELAS DE CONFIGURAÇÃO E USUÁRIOS
+    %% CONFIGURATION & USERS
     %% ---------------------------------------------------------
 
     WORK_SCHEDULES {
@@ -69,7 +114,7 @@ erDiagram
 
     LOCATIONS {
         uuid id PK
-        uuid user_id FK "Nullable: Se NULL é Sede"
+        uuid user_id FK "Nullable: If NULL = HQ"
         varchar name
         varchar type "Enum: OFFICE, HOME"
         decimal latitude
@@ -78,7 +123,7 @@ erDiagram
     }
 
     %% ---------------------------------------------------------
-    %% TABELAS OPERACIONAIS
+    %% OPERATIONAL (TIME TRACKING)
     %% ---------------------------------------------------------
 
     TIME_ENTRIES {
@@ -103,14 +148,14 @@ erDiagram
     }
 
     %% ---------------------------------------------------------
-    %% TABELAS DE GESTÃO E AUDITORIA
+    %% MANAGEMENT & AUDIT
     %% ---------------------------------------------------------
 
     REQUESTS {
         uuid id PK
         uuid requester_id FK
         uuid reviewer_id FK
-        varchar type "Enum: ATESTADO, ESQUECIMENTO"
+        varchar type "Enum: CERTIFICATE, FORGOT_PUNCH"
         date target_date
         varchar status "Enum: PENDING, APPROVED"
         text justification_user
@@ -133,29 +178,17 @@ erDiagram
     }
 
     %% ---------------------------------------------------------
-    %% RELACIONAMENTOS
+    %% RELATIONSHIPS
     %% ---------------------------------------------------------
 
-    %% Uma Jornada tem vários Usuários
-    WORK_SCHEDULES ||--|{ USERS : "define regras para"
-
-    %% Um Usuário tem vários locais (ou nenhum, se usar só a sede)
-    USERS ||--o{ LOCATIONS : "possui casas/locais"
-
-    %% Um Usuário tem muitos registros de ponto
-    USERS ||--o{ TIME_ENTRIES : "registra"
-
-    %% Um Usuário tem muitos saldos diários
-    USERS ||--o{ DAILY_BALANCES : "acumula"
-
-    %% Um Usuário faz muitas solicitações
-    USERS ||--o{ REQUESTS : "solicita (requester)"
-
-    %% Um Usuário (RH) revisa muitas solicitações (Opcional, pois pode ser null)
-    USERS ||--o{ REQUESTS : "revisa (reviewer)"
-
-    %% Uma solicitação tem anexos
-    REQUESTS ||--|{ ATTACHMENTS : "contém provas"
+    WORK_SCHEDULES ||--|{ USERS : "defines rules for"
+    USERS ||--o{ LOCATIONS : "has locations"
+    USERS ||--o{ TIME_ENTRIES : "logs"
+    USERS ||--o{ DAILY_BALANCES : "accumulates"
+    USERS ||--o{ REQUESTS : "submits (requester)"
+    USERS ||--o{ REQUESTS : "reviews (reviewer)"
+    REQUESTS ||--|{ ATTACHMENTS : "contains proof"
+    USERS ||--o{ AUDIT_LOGS : "triggers logs"
 
     %% Um Usuário gera logs
     USERS ||--o{ AUDIT_LOGS : "aciona logs"

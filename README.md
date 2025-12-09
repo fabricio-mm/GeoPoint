@@ -43,8 +43,6 @@ The project was built following Clean Architecture principles and separation of 
 | **Testing** | xUnit / Cypress | Unit tests (Business Logic) and E2E |
 | **Infra** | Docker | Containerization for development |
 ---
-
-```mermaid
 graph TD
     %% Atores
     User((Colaborador/RH))

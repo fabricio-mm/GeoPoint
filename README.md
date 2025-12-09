@@ -153,6 +153,7 @@ erDiagram
     %% Um Usuário gera logs
     USERS ||--o{ AUDIT_LOGS : "aciona logs"
 
+```mermaid
 graph TD
     %% Atores
     User((Colaborador/RH))

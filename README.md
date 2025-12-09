@@ -43,52 +43,7 @@ The project was built following Clean Architecture principles and separation of 
 | **Testing** | xUnit / Cypress | Unit tests (Business Logic) and E2E |
 | **Infra** | Docker | Containerization for development |
 ---
-graph TD
-    %% Atores
-    User((Colaborador/RH))
-    
-    %% Frontend
-    subgraph Client [Frontend SPA]
-        React[React App]
-        GPS[Navegador API Geo]
-    end
 
-    %% Backend
-    subgraph Server [Backend API]
-        API[.NET 8 Web API]
-        Auth[JWT Service]
-        Calc[Engine CLT]
-    end
-
-    %% Dados
-    subgraph Data [Persistência & Cache]
-        Redis[(Redis Cache)]
-        Postgres[(PostgreSQL)]
-        Storage[Blob Storage]
-    end
-
-    %% Fluxos
-    User --> React
-    React -- 1. Coordenadas --> GPS
-    GPS -.-> React
-    React -- 2. HTTPS Request --> API
-    
-    %% Conexões Internas do Backend (Lógica)
-    API -.- Auth
-    API -.- Calc
-
-    %% Fluxos de Dados
-    API -- 3. Verifica Cache/Lock --> Redis
-    API -- 4. Persiste Dados --> Postgres
-    API -- 5. Salva Atestado --> Storage
-    
-    Redis -.-> API
-    Postgres -.-> API
-    
-    %% Estilização
-    style Redis fill:#ffcccc,stroke:#ff0000,stroke-width:2px
-    style Postgres fill:#ccddff,stroke:#0066cc,stroke-width:2px
-    style API fill:#d9d2e9,stroke:#674ea7,stroke-width:2px
 
 ## 🗂️ Data Modeling
 
@@ -197,3 +152,50 @@ erDiagram
 
     %% Um Usuário gera logs
     USERS ||--o{ AUDIT_LOGS : "aciona logs"
+
+graph TD
+    %% Atores
+    User((Colaborador/RH))
+    
+    %% Frontend
+    subgraph Client [Frontend SPA]
+        React[React App]
+        GPS[Navegador API Geo]
+    end
+
+    %% Backend
+    subgraph Server [Backend API]
+        API[.NET 8 Web API]
+        Auth[JWT Service]
+        Calc[Engine CLT]
+    end
+
+    %% Dados
+    subgraph Data [Persistência & Cache]
+        Redis[(Redis Cache)]
+        Postgres[(PostgreSQL)]
+        Storage[Blob Storage]
+    end
+
+    %% Fluxos
+    User --> React
+    React -- 1. Coordenadas --> GPS
+    GPS -.-> React
+    React -- 2. HTTPS Request --> API
+    
+    %% Conexões Internas do Backend (Lógica)
+    API -.- Auth
+    API -.- Calc
+
+    %% Fluxos de Dados
+    API -- 3. Verifica Cache/Lock --> Redis
+    API -- 4. Persiste Dados --> Postgres
+    API -- 5. Salva Atestado --> Storage
+    
+    Redis -.-> API
+    Postgres -.-> API
+    
+    %% Estilização
+    style Redis fill:#ffcccc,stroke:#ff0000,stroke-width:2px
+    style Postgres fill:#ccddff,stroke:#0066cc,stroke-width:2px
+    style API fill:#d9d2e9,stroke:#674ea7,stroke-width:2px

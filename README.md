@@ -1,5 +1,3 @@
-# GeoPoint
-Complete time tracking system for hybrid work (Home Office/On-site). Built with .NET 8 and React, it features GPS perimeter validation, automatic work hour calculations, medical certificate approval workflows, and HR auditing.
 
 # 📍 GeoPoint - Smart Hybrid Time Tracking System
 
@@ -28,7 +26,7 @@ Complete time tracking system for hybrid work (Home Office/On-site). Built with 
 
 ## 🛠️ Tech Stack
 
-The project was built following Clean Architecture principles and separation of concerns.
+The project was built following Clean Architecture principles.
 
 | Layer | Technology | Details |
 | :--- | :--- | :--- |
@@ -38,57 +36,68 @@ The project was built following Clean Architecture principles and separation of 
 | **Database** | PostgreSQL | Relational, usage of JSONB and Geographic Types |
 | **Testing** | xUnit / Cypress | Unit tests (Business Logic) and E2E |
 | **Infra** | Docker | Containerization for development |
+
 ---
 
-graph TD
+## 📐 System Architecture & Design
 
+### 1. High-Level Architecture
+The diagram below illustrates how the Client, API, and Data layers interact, highlighting the role of **Redis** in performance.
+
+```mermaid
+graph TD
+    %% Actors
+    User((Employee/HR))
+    
     %% Frontend
     subgraph Client [Frontend SPA]
         React[React App]
-        GPS[Navegador API Geo]
+        GPS[Browser Geo API]
     end
 
     %% Backend
     subgraph Server [Backend API]
         API[.NET 8 Web API]
         Auth[JWT Service]
-        Calc[Engine CLT]
+        Calc[CLT Engine]
     end
 
-    %% Dados
-    subgraph Data [Persistência & Cache]
+    %% Data
+    subgraph Data [Persistence & Cache]
         Redis[(Redis Cache)]
         Postgres[(PostgreSQL)]
         Storage[Blob Storage]
     end
 
-    %% Fluxos
+    %% Flows
     User --> React
-    React -- 1. Coordenadas --> GPS
+    React -- 1. Coordinates --> GPS
     GPS -.-> React
     React -- 2. HTTPS Request --> API
     
-    %% Conexões Internas do Backend (Lógica)
+    %% Internal Backend Connections
     API -.- Auth
     API -.- Calc
 
-    %% Fluxos de Dados
-    API -- 3. Verifica Cache/Lock --> Redis
-    API -- 4. Persiste Dados --> Postgres
-    API -- 5. Salva Atestado --> Storage
+    %% Data Flows
+    API -- 3. Check Cache/Lock --> Redis
+    API -- 4. Persist Data --> Postgres
+    API -- 5. Save Files --> Storage
     
     Redis -.-> API
     Postgres -.-> API
     
-    %% Estilização
+    %% Styling
     style Redis fill:#ffcccc,stroke:#ff0000,stroke-width:2px
     style Postgres fill:#ccddff,stroke:#0066cc,stroke-width:2px
     style API fill:#d9d2e9,stroke:#674ea7,stroke-width:2px
+````
 
+### 2\. Database Schema (PostgreSQL)
 
-## 🗂️ Data Modeling
+The database was designed for high integrity and auditing.
 
-The database was designed for high integrity and auditing. Below is a simplified relationship diagram:
+> **Note:** High-read tables (such as `DAILY_BALANCES`) utilize a **Cache-Aside strategy**. The relational database serves as the source of truth, while Redis serves "hot data".
 
 ```mermaid
 erDiagram
@@ -190,6 +199,64 @@ erDiagram
     USERS ||--o{ REQUESTS : "reviews (reviewer)"
     REQUESTS ||--|{ ATTACHMENTS : "contains proof"
     USERS ||--o{ AUDIT_LOGS : "triggers logs"
+```
 
-    %% Um Usuário gera logs
-    USERS ||--o{ AUDIT_LOGS : "aciona logs"
+-----
+
+## ⚡ How to Run Locally
+
+### Prerequisites
+
+  - [Node.js](https://nodejs.org/) (v18+)
+  - [.NET 8 SDK](https://dotnet.microsoft.com/download)
+  - [Docker](https://www.docker.com/) (For Postgres & Redis)
+
+### 1\. Setup Backend
+
+```bash
+# Clone the repository
+git clone [https://github.com/your-username/geopoint.git](https://github.com/your-username/geopoint.git)
+cd geopoint/backend
+
+# Run Infrastructure (Postgres + Redis)
+docker-compose up -d
+
+# Run migrations
+dotnet ef database update
+
+# Start the API
+dotnet watch run
+```
+
+### 2\. Setup Frontend
+
+```bash
+cd ../frontend
+
+# Install dependencies
+npm install
+
+# Start the project
+npm run dev
+```
+
+-----
+
+## 🧪 Testing Strategy
+
+To ensure reliability in labor law compliance (hour calculations and tolerance rules), we use robust unit tests.
+
+```bash
+# Run Backend tests
+cd backend
+dotnet test
+```
+
+To validate geolocation features, we use **GPS Mocks** in E2E tests with Cypress, simulating "Inside Perimeter" and "Outside Perimeter" scenarios.
+
+## 📄 License
+
+This project is licensed under the MIT License. See the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
+
+```
+```

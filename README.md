@@ -1,4 +1,3 @@
-
 # 📍 GeoPoint - Smart Hybrid Time Tracking System
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
@@ -6,18 +5,24 @@
 ![.NET](https://img.shields.io/badge/.NET-8.0-purple)
 ![React](https://img.shields.io/badge/React-18-blue)
 
-**GeoPoint** is a modern solution for time and attendance tracking focused on the hybrid work model (On-site and Remote/Home Office). Unlike traditional systems, it uses **Geofencing** to validate the employee's physical presence at the agreed location (Headquarters or Registered Home) via the browser, ensuring legal security and flexibility.
+**GeoPoint** is a modern solution for time and attendance tracking focused on the hybrid work model (On-site and
+Remote/Home Office). Unlike traditional systems, it uses **Geofencing** to validate the employee's physical presence at
+the agreed location (Headquarters or Registered Home) via the browser, ensuring legal security and flexibility.
 
 ## 🚀 Key Features
 
 ### 👤 For Employees
-- **Geolocation Clock-in:** Punching in is only allowed if the device is within a **140m radius** of a permitted location.
+
+- **Geolocation Clock-in:** Punching in is only allowed if the device is within a **140m radius** of a permitted
+  location.
 - **Real-Time Dashboard:** View hour balance, daily goals, and a visual progress bar.
 - **Transparent History:** 3-month timesheet history with a map pin showing the exact location of each record.
 - **Request Center:** Submit medical certificates (via camera/upload) and justify missed punches.
 
 ### 🏢 For HR / Management
-- **Perimeter Management:** Visual map interface to register and adjust employee home locations for accurate remote validation.
+
+- **Perimeter Management:** Visual map interface to register and adjust employee home locations for accurate remote
+  validation.
 - **Automated Calculations:** Built-in rules for tolerance (e.g., 5/10 min rules), overtime, and hour bank management.
 - **Complete Audit:** Immutable logs for any manual adjustment made to time records.
 - **Approval Workflow:** Accept or reject certificates and time adjustments with a single click.
@@ -28,21 +33,23 @@
 
 The project was built following Clean Architecture principles.
 
-| Layer | Technology | Details |
-| :--- | :--- | :--- |
-| **Frontend** | React.js | SPA, Hooks, Context API, TailwindCSS |
-| **Backend** | C# .NET 8 | Web API, Entity Framework Core |
-| **Cache** | **Redis** | Distributed cache for performance and idempotency control |
-| **Database** | PostgreSQL | Relational, usage of JSONB and Geographic Types |
-| **Testing** | xUnit / Cypress | Unit tests (Business Logic) and E2E |
-| **Infra** | Docker | Containerization for development |
+| Layer        | Technology      | Details                                                   |
+|:-------------|:----------------|:----------------------------------------------------------|
+| **Frontend** | React.js        | SPA, Hooks, Context API, TailwindCSS                      |
+| **Backend**  | C# .NET 8       | Web API, Entity Framework Core                            |
+| **Cache**    | **Redis**       | Distributed cache for performance and idempotency control |
+| **Database** | PostgreSQL      | Relational, usage of JSONB and Geographic Types           |
+| **Testing**  | xUnit / Cypress | Unit tests (Business Logic) and E2E                       |
+| **Infra**    | Docker          | Containerization for development                          |
 
 ---
 
 ## 📐 System Architecture & Design
 
 ### 1. High-Level Architecture
-The diagram below illustrates how the Client, API, and Data layers interact, highlighting the role of **Redis** in performance.
+
+The diagram below illustrates how the Client, API, and Data layers interact, highlighting the role of **Redis** in
+performance.
 
 ```mermaid
 graph TD
@@ -97,7 +104,8 @@ graph TD
 
 The database was designed for high integrity and auditing.
 
-> **Note:** High-read tables (such as `DAILY_BALANCES`) utilize a **Cache-Aside strategy**. The relational database serves as the source of truth, while Redis serves "hot data".
+> **Note:** High-read tables (such as `DAILY_BALANCES`) utilize a **Cache-Aside strategy**. The relational database
+> serves as the source of truth, while Redis serves "hot data".
 
 ```mermaid
 erDiagram
@@ -207,9 +215,9 @@ erDiagram
 
 ### Prerequisites
 
-  - [Node.js](https://nodejs.org/) (v18+)
-  - [.NET 8 SDK](https://dotnet.microsoft.com/download)
-  - [Docker](https://www.docker.com/) (For Postgres & Redis)
+- [Node.js](https://nodejs.org/) (v18+)
+- [.NET 8 SDK](https://dotnet.microsoft.com/download)
+- [Docker](https://www.docker.com/) (For Postgres & Redis)
 
 ### 1\. Setup Backend
 
@@ -252,11 +260,13 @@ cd backend
 dotnet test
 ```
 
-To validate geolocation features, we use **GPS Mocks** in E2E tests with Cypress, simulating "Inside Perimeter" and "Outside Perimeter" scenarios.
+To validate geolocation features, we use **GPS Mocks** in E2E tests with Cypress, simulating "Inside Perimeter" and "
+Outside Perimeter" scenarios.
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](https://www.google.com/search?q=LICENSE) file for
+details.
 
 ```
 ```

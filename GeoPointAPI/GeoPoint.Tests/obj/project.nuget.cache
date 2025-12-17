@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "mQpwaxzNQK4=",
+  "dgSpecHash": "u4C1wLQjfBM=",
   "success": true,
-  "projectFilePath": "C:\\Users\\50119426\\Geopoint\\GeoPointAPI\\GeoPoint.Tests\\GeoPoint.Tests.csproj",
+  "projectFilePath": "C:\\Users\\50119426\\Desktop\\GeoPoint\\GeoPointAPI\\GeoPoint.Tests\\GeoPoint.Tests.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\50119426\\.nuget\\packages\\coverlet.collector\\6.0.0\\coverlet.collector.6.0.0.nupkg.sha512",
     "C:\\Users\\50119426\\.nuget\\packages\\fluentassertions\\8.8.0\\fluentassertions.8.8.0.nupkg.sha512",

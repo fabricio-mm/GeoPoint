@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "DZ6o7mBq0y8=",
+  "dgSpecHash": "A3HoW1BmFuw=",
   "success": true,
-  "projectFilePath": "C:\\Users\\50119426\\Geopoint\\GeoPointAPI\\GeoPointAPI\\GeoPointAPI.csproj",
+  "projectFilePath": "C:\\Users\\50119426\\Desktop\\GeoPoint\\GeoPointAPI\\GeoPointAPI\\GeoPointAPI.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\50119426\\.nuget\\packages\\microsoft.aspnetcore.authentication.abstractions\\2.3.0\\microsoft.aspnetcore.authentication.abstractions.2.3.0.nupkg.sha512",
     "C:\\Users\\50119426\\.nuget\\packages\\microsoft.aspnetcore.authentication.core\\2.3.0\\microsoft.aspnetcore.authentication.core.2.3.0.nupkg.sha512",

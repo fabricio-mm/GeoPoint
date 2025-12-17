@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GeoPoint.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+956f2a28d6c547390fe783d5512a2229bd815f32")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+278d71f32a5c642c041e55a17e1b878fdc84704b")]
 [assembly: System.Reflection.AssemblyProductAttribute("GeoPoint.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GeoPoint.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

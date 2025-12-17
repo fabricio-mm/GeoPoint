@@ -16,9 +16,7 @@
 
     <ItemGroup>
       <Folder Include="controllers\" />
-      <Folder Include="data\" />
       <Folder Include="dtos\" />
-      <Folder Include="models\" />
     </ItemGroup>
 
 </Project>

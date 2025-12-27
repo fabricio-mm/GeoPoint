@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GeoPointAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+278d71f32a5c642c041e55a17e1b878fdc84704b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+58e7ea341ca35887ae222e4674a6a9810ad1a577")]
 [assembly: System.Reflection.AssemblyProductAttribute("GeoPointAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GeoPointAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

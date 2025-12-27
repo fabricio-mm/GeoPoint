@@ -1,18 +1,26 @@
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization; // <--- ADICIONEI ESTE USING (IMPORTANTE)
+using GeoPointAPI.data;
 
-using GeoPointAPI.data; // 1. Namespace onde o AppDbContext está
-
-// Cria o "construtor" da aplicação
 var builder = WebApplication.CreateBuilder(args);
+
+// Configuração do Banco de Dados
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
 );
 
-// Adiciona os serviços padrões para os Controllers (API)
-builder.Services.AddControllers();
+// --- A CORREÇÃO ESTÁ AQUI ---
+// Configuramos o JSON para ignorar ciclos (loops) infinitos entre as tabelas
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient();
+
 var app = builder.Build();
 
 // Habilita o Swagger apenas em ambiente de Desenvolvimento
@@ -25,6 +33,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
+
 app.Run();
 
 public partial class Program { }

@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Header from '@/components/Header/Header';
-import { mockUsers, mockTimeRecords, mockWorkSchedules, mockRequests } from '@/data/mockData';
+import { usersApi, workSchedulesApi, timeEntriesApi, requestsApi, User as ApiUser, WorkSchedule as ApiWorkSchedule, TimeEntry } from '@/services/api';
 import { User, Clock, Calendar, CheckCircle, AlertCircle, XCircle, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { toast } from 'sonner';
 import './AdminDashboard.css';
 
 type TabType = 'apontamentos' | 'usuarios' | 'jornadas';
@@ -12,18 +13,22 @@ const typeLabels: Record<string, string> = {
   exit: 'Saída',
   break_start: 'Início Intervalo',
   break_end: 'Fim Intervalo',
+  ENTRY: 'Entrada',
+  EXIT: 'Saída',
 };
 
 const roleLabels: Record<string, string> = {
   admin: 'Administrador',
   rh_analyst: 'RH Analyst',
   employee: 'Funcionário',
+  ADMIN: 'Administrador',
+  HR: 'Analista RH',
+  EMPLOYEE: 'Funcionário',
 };
 
-const workModeLabels: Record<string, string> = {
-  office: 'Presencial',
-  home_office: 'Home Office',
-  hybrid: 'Híbrido',
+const statusLabels: Record<string, string> = {
+  ACTIVE: 'Ativo',
+  INACTIVE: 'Inativo',
 };
 
 interface DayRecord {
@@ -57,29 +62,71 @@ export default function AdminDashboard() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('day');
   const [selectedDayRecord, setSelectedDayRecord] = useState<DayRecord | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
+  
+  // API data
+  const [users, setUsers] = useState<ApiUser[]>([]);
+  const [workSchedules, setWorkSchedules] = useState<ApiWorkSchedule[]>([]);
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const totalUsers = mockUsers.length;
-  const activeUsers = mockUsers.filter(u => u.role !== 'admin').length;
-  const totalRecords = mockTimeRecords.length;
-  const todayRecords = mockTimeRecords.filter(r => {
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [usersData, schedulesData] = await Promise.all([
+        usersApi.getAll(),
+        workSchedulesApi.getAll(),
+      ]);
+      setUsers(usersData);
+      setWorkSchedules(schedulesData);
+
+      // Load time entries for all users
+      const allEntries: TimeEntry[] = [];
+      for (const user of usersData) {
+        try {
+          const entries = await timeEntriesApi.getByUser(user.id);
+          allEntries.push(...entries);
+        } catch (err) {
+          console.error(`Error loading entries for user ${user.id}:`, err);
+        }
+      }
+      setTimeEntries(allEntries);
+    } catch (err) {
+      console.error('Error loading data:', err);
+      toast.error('Erro ao carregar dados');
+    }
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const totalUsers = users.length;
+  const activeUsers = users.filter(u => u.status === 'ACTIVE').length;
+  const totalRecords = timeEntries.length;
+  const todayRecords = timeEntries.filter(r => {
     const today = new Date();
-    return r.timestamp.toDateString() === today.toDateString();
+    const recordDate = r.createdAt ? new Date(r.createdAt) : new Date();
+    return recordDate.toDateString() === today.toDateString();
   }).length;
 
   // Group records by day and user
   const consolidatedRecords = useMemo(() => {
     const recordsMap = new Map<string, DayRecord>();
+    const usersMap = new Map(users.map(u => [u.id, u]));
     
-    mockTimeRecords.forEach(record => {
-      const dateStr = record.timestamp.toDateString();
+    timeEntries.forEach(record => {
+      const timestamp = record.createdAt ? new Date(record.createdAt) : new Date();
+      const dateStr = timestamp.toDateString();
       const key = `${record.userId}-${dateStr}`;
+      const user = usersMap.get(record.userId);
       
       if (!recordsMap.has(key)) {
         recordsMap.set(key, {
-          date: new Date(record.timestamp.toDateString()),
+          date: new Date(timestamp.toDateString()),
           dateString: dateStr,
           userId: record.userId,
-          userName: record.userName,
+          userName: user?.fullName || 'Usuário',
           workedHours: 0,
           requiredHours: 8,
           status: 'pending',
@@ -89,28 +136,24 @@ export default function AdminDashboard() {
       
       const dayRecord = recordsMap.get(key)!;
       
-      switch (record.type) {
-        case 'entry':
-          dayRecord.entry = record.timestamp;
-          break;
-        case 'break_start':
-          dayRecord.breakStart = record.timestamp;
-          break;
-        case 'break_end':
-          dayRecord.breakEnd = record.timestamp;
-          break;
-        case 'exit':
-          dayRecord.exit = record.timestamp;
-          break;
-      }
-      
-      if (!record.validated) {
-        dayRecord.hasError = true;
+      // Map API type to local type
+      if (record.type === 'ENTRY') {
+        if (!dayRecord.entry) {
+          dayRecord.entry = timestamp;
+        } else if (!dayRecord.breakEnd) {
+          dayRecord.breakEnd = timestamp;
+        }
+      } else if (record.type === 'EXIT') {
+        if (!dayRecord.breakStart && dayRecord.entry) {
+          dayRecord.breakStart = timestamp;
+        } else {
+          dayRecord.exit = timestamp;
+        }
       }
     });
 
     // Calculate worked hours and status
-    recordsMap.forEach((dayRecord, key) => {
+    recordsMap.forEach((dayRecord) => {
       if (dayRecord.entry && dayRecord.exit) {
         const entryTime = dayRecord.entry.getTime();
         const exitTime = dayRecord.exit.getTime();
@@ -135,27 +178,10 @@ export default function AdminDashboard() {
           dayRecord.status = 'incomplete';
         }
       }
-
-      // Check for justifications
-      const justification = mockRequests.find(req => 
-        req.userId === dayRecord.userId && 
-        req.referenceDate.toDateString() === dayRecord.dateString
-      );
-      
-      if (justification) {
-        dayRecord.justification = {
-          type: justification.type,
-          status: justification.status,
-          description: justification.description,
-        };
-        if (justification.status === 'approved') {
-          dayRecord.status = 'justified';
-        }
-      }
     });
 
     return Array.from(recordsMap.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, []);
+  }, [timeEntries, users]);
 
   // Get records for a specific date
   const getRecordsForDate = (date: Date) => {
@@ -210,12 +236,10 @@ export default function AdminDashboard() {
     
     const days: (Date | null)[] = [];
     
-    // Add empty days for the start of the week
     for (let i = 0; i < firstDay.getDay(); i++) {
       days.push(null);
     }
     
-    // Add all days of the month
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push(new Date(year, month, i));
     }
@@ -316,19 +340,19 @@ export default function AdminDashboard() {
             <div className="admin-stats">
               <div className="stat-card">
                 <div className="stat-card-title">Total de Usuários</div>
-                <div className="stat-card-value">{totalUsers}</div>
+                <div className="stat-card-value">{isLoading ? '...' : totalUsers}</div>
               </div>
               <div className="stat-card">
                 <div className="stat-card-title">Usuários Ativos</div>
-                <div className="stat-card-value">{activeUsers}</div>
+                <div className="stat-card-value">{isLoading ? '...' : activeUsers}</div>
               </div>
               <div className="stat-card">
                 <div className="stat-card-title">Total de Registros</div>
-                <div className="stat-card-value">{totalRecords}</div>
+                <div className="stat-card-value">{isLoading ? '...' : totalRecords}</div>
               </div>
               <div className="stat-card">
                 <div className="stat-card-title">Registros Hoje</div>
-                <div className="stat-card-value">{todayRecords}</div>
+                <div className="stat-card-value">{isLoading ? '...' : todayRecords}</div>
               </div>
             </div>
 
@@ -336,7 +360,6 @@ export default function AdminDashboard() {
               <div className="records-header">
                 <h2 className="records-title">Apontamentos por Dia</h2>
                 <div className="records-filters">
-                  {/* Period Filter */}
                   <div className="period-filter">
                     <button 
                       className={`period-filter-btn ${periodFilter === 'day' ? 'active' : ''}`}
@@ -358,7 +381,6 @@ export default function AdminDashboard() {
                     </button>
                   </div>
                   
-                  {/* Date Navigation */}
                   <div className="date-navigator">
                     <button className="date-nav-btn" onClick={() => navigatePeriod('prev')}>
                       <ChevronLeft size={20} />
@@ -385,280 +407,289 @@ export default function AdminDashboard() {
                     onChange={(e) => setSelectedUser(e.target.value)}
                   >
                     <option value="all">Todos os Usuários</option>
-                    {mockUsers.map((user) => (
-                      <option key={user.id} value={user.id}>{user.name}</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>{user.fullName}</option>
                     ))}
                   </select>
                 </div>
               </div>
 
-              {/* Week View */}
-              {periodFilter === 'week' && !selectedCalendarDate && (
-                <div className="admin-week-view">
-                  <div className="week-grid">
-                    {getWeekDays().map((day, index) => {
-                      const status = getDateStatus(day);
-                      const isToday = day.toDateString() === new Date().toDateString();
-                      const dayRecords = getRecordsForDate(day);
-                      
-                      return (
-                        <div 
-                          key={index}
-                          className={`week-day-card ${status} ${isToday ? 'today' : ''}`}
-                          onClick={() => handleDayClick(day)}
-                        >
-                          <div className="week-day-header">
-                            <span className="week-day-name">{WEEKDAYS_FULL[index]}</span>
-                            <span className="week-day-date">{day.getDate()}/{day.getMonth() + 1}</span>
-                          </div>
-                          <div className="week-day-content">
-                            {dayRecords.length > 0 ? (
-                              <div className="week-day-users">
-                                {dayRecords.slice(0, 3).map((record, idx) => (
-                                  <div key={idx} className={`week-user-pill ${record.status}`}>
-                                    <User size={12} />
-                                    <span>{record.userName.split(' ')[0]}</span>
+              {isLoading ? (
+                <div className="records-empty">
+                  <Clock size={48} className="empty-icon" />
+                  <p>Carregando...</p>
+                </div>
+              ) : (
+                <>
+                  {/* Week View */}
+                  {periodFilter === 'week' && !selectedCalendarDate && (
+                    <div className="admin-week-view">
+                      <div className="week-grid">
+                        {getWeekDays().map((day, index) => {
+                          const status = getDateStatus(day);
+                          const isToday = day.toDateString() === new Date().toDateString();
+                          const dayRecords = getRecordsForDate(day);
+                          
+                          return (
+                            <div 
+                              key={index}
+                              className={`week-day-card ${status} ${isToday ? 'today' : ''}`}
+                              onClick={() => handleDayClick(day)}
+                            >
+                              <div className="week-day-header">
+                                <span className="week-day-name">{WEEKDAYS_FULL[index]}</span>
+                                <span className="week-day-date">{day.getDate()}/{day.getMonth() + 1}</span>
+                              </div>
+                              <div className="week-day-content">
+                                {dayRecords.length > 0 ? (
+                                  <div className="week-day-users">
+                                    {dayRecords.slice(0, 3).map((record, idx) => (
+                                      <div key={idx} className={`week-user-pill ${record.status}`}>
+                                        <User size={12} />
+                                        <span>{record.userName.split(' ')[0]}</span>
+                                      </div>
+                                    ))}
+                                    {dayRecords.length > 3 && (
+                                      <span className="more-users">+{dayRecords.length - 3}</span>
+                                    )}
                                   </div>
-                                ))}
-                                {dayRecords.length > 3 && (
-                                  <span className="more-users">+{dayRecords.length - 3}</span>
+                                ) : (
+                                  <span className="no-records">Sem registros</span>
                                 )}
                               </div>
-                            ) : (
-                              <span className="no-records">Sem registros</span>
-                            )}
-                          </div>
-                          {status === 'incomplete' && (
-                            <div className="week-day-alert">
-                              <AlertCircle size={14} />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Month View */}
-              {periodFilter === 'month' && !selectedCalendarDate && (
-                <div className="admin-month-view">
-                  <div className="month-header">
-                    {WEEKDAYS.map(day => (
-                      <div key={day} className="month-weekday">{day}</div>
-                    ))}
-                  </div>
-                  <div className="month-grid">
-                    {getMonthDays().map((day, index) => {
-                      if (!day) {
-                        return <div key={index} className="month-day empty" />;
-                      }
-                      
-                      const status = getDateStatus(day);
-                      const isToday = day.toDateString() === new Date().toDateString();
-                      const dayRecords = getRecordsForDate(day);
-                      
-                      return (
-                        <div 
-                          key={index}
-                          className={`month-day ${status} ${isToday ? 'today' : ''}`}
-                          onClick={() => handleDayClick(day)}
-                        >
-                          <span className="month-day-number">{day.getDate()}</span>
-                          {dayRecords.length > 0 && (
-                            <div className="month-day-indicator">
-                              <span className="record-count">{dayRecords.length}</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="month-legend">
-                    <div className="legend-item"><span className="legend-dot complete"></span> Completo</div>
-                    <div className="legend-item"><span className="legend-dot incomplete"></span> Horas Faltantes</div>
-                    <div className="legend-item"><span className="legend-dot pending"></span> Pendente</div>
-                  </div>
-                </div>
-              )}
-
-              {/* Day View (default or when a day is selected from week/month) */}
-              {(periodFilter === 'day' || selectedCalendarDate) && (
-                <>
-                  {selectedCalendarDate && (
-                    <div className="selected-day-header">
-                      <button 
-                        className="back-to-calendar"
-                        onClick={() => setSelectedCalendarDate(null)}
-                      >
-                        <ChevronLeft size={16} />
-                        <span>Voltar para {periodFilter === 'week' ? 'semana' : 'mês'}</span>
-                      </button>
-                      <h3>{formatDate(selectedCalendarDate)}</h3>
-                    </div>
-                  )}
-
-                  {filteredRecords.length === 0 ? (
-                    <div className="records-empty">
-                      <Calendar size={48} className="empty-icon" />
-                      <p>Nenhum registro encontrado para esta data</p>
-                    </div>
-                  ) : (
-                    <div className="day-records-grid">
-                      {filteredRecords.map((record) => {
-                        const statusInfo = getStatusInfo(record);
-                        const StatusIcon = statusInfo.icon;
-                        
-                        return (
-                          <div 
-                            key={`${record.userId}-${record.dateString}`}
-                            className={`day-record-card ${selectedDayRecord?.userId === record.userId && selectedDayRecord?.dateString === record.dateString ? 'selected' : ''} ${record.hasError ? 'has-error' : ''}`}
-                            onClick={() => setSelectedDayRecord(record)}
-                          >
-                            <div className="day-record-header">
-                              <div className="day-record-user">
-                                <User size={18} />
-                                <span>{record.userName}</span>
-                              </div>
-                              <div className={`day-record-status ${statusInfo.className}`}>
-                                <StatusIcon size={14} />
-                                <span>{statusInfo.label}</span>
-                              </div>
-                            </div>
-                            
-                            <div className="day-record-times">
-                              <div className="time-slot">
-                                <span className="time-label">Entrada</span>
-                                <span className="time-value">{formatTime(record.entry)}</span>
-                              </div>
-                              <div className="time-slot">
-                                <span className="time-label">Intervalo</span>
-                                <span className="time-value">
-                                  {formatTime(record.breakStart)} - {formatTime(record.breakEnd)}
-                                </span>
-                              </div>
-                              <div className="time-slot">
-                                <span className="time-label">Saída</span>
-                                <span className="time-value">{formatTime(record.exit)}</span>
-                              </div>
-                            </div>
-                            
-                            <div className="day-record-summary">
-                              <div className="hours-worked">
-                                <Clock size={14} />
-                                <span>{record.workedHours.toFixed(1)}h / {record.requiredHours}h</span>
-                              </div>
-                              {record.justification && (
-                                <div className={`justification-badge ${record.justification.status}`}>
-                                  <FileText size={12} />
-                                  <span>
-                                    {record.justification.type === 'medical_certificate' && 'Atestado'}
-                                    {record.justification.type === 'vacation' && 'Férias'}
-                                    {record.justification.type === 'time_adjustment' && 'Ajuste'}
-                                    {' - '}
-                                    {record.justification.status === 'approved' && 'Aprovado'}
-                                    {record.justification.status === 'pending' && 'Pendente'}
-                                    {record.justification.status === 'rejected' && 'Rejeitado'}
-                                  </span>
+                              {status === 'incomplete' && (
+                                <div className="week-day-alert">
+                                  <AlertCircle size={14} />
                                 </div>
                               )}
                             </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Month View */}
+                  {periodFilter === 'month' && !selectedCalendarDate && (
+                    <div className="admin-month-view">
+                      <div className="month-header">
+                        {WEEKDAYS.map(day => (
+                          <div key={day} className="month-weekday">{day}</div>
+                        ))}
+                      </div>
+                      <div className="month-grid">
+                        {getMonthDays().map((day, index) => {
+                          if (!day) {
+                            return <div key={index} className="month-day empty" />;
+                          }
+                          
+                          const status = getDateStatus(day);
+                          const isToday = day.toDateString() === new Date().toDateString();
+                          const dayRecords = getRecordsForDate(day);
+                          
+                          return (
+                            <div 
+                              key={index}
+                              className={`month-day ${status} ${isToday ? 'today' : ''}`}
+                              onClick={() => handleDayClick(day)}
+                            >
+                              <span className="month-day-number">{day.getDate()}</span>
+                              {dayRecords.length > 0 && (
+                                <div className="month-day-indicator">
+                                  <span className="record-count">{dayRecords.length}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="month-legend">
+                        <div className="legend-item"><span className="legend-dot complete"></span> Completo</div>
+                        <div className="legend-item"><span className="legend-dot incomplete"></span> Horas Faltantes</div>
+                        <div className="legend-item"><span className="legend-dot pending"></span> Pendente</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Day View */}
+                  {(periodFilter === 'day' || selectedCalendarDate) && (
+                    <>
+                      {selectedCalendarDate && (
+                        <div className="selected-day-header">
+                          <button 
+                            className="back-to-calendar"
+                            onClick={() => setSelectedCalendarDate(null)}
+                          >
+                            <ChevronLeft size={16} />
+                            <span>Voltar para {periodFilter === 'week' ? 'semana' : 'mês'}</span>
+                          </button>
+                          <h3>{formatDate(selectedCalendarDate)}</h3>
+                        </div>
+                      )}
+
+                      {filteredRecords.length === 0 ? (
+                        <div className="records-empty">
+                          <Calendar size={48} className="empty-icon" />
+                          <p>Nenhum registro encontrado para esta data</p>
+                        </div>
+                      ) : (
+                        <div className="day-records-grid">
+                          {filteredRecords.map((record) => {
+                            const statusInfo = getStatusInfo(record);
+                            const StatusIcon = statusInfo.icon;
+                            
+                            return (
+                              <div 
+                                key={`${record.userId}-${record.dateString}`}
+                                className={`day-record-card ${selectedDayRecord?.userId === record.userId && selectedDayRecord?.dateString === record.dateString ? 'selected' : ''} ${record.hasError ? 'has-error' : ''}`}
+                                onClick={() => setSelectedDayRecord(record)}
+                              >
+                                <div className="day-record-header">
+                                  <div className="day-record-user">
+                                    <User size={18} />
+                                    <span>{record.userName}</span>
+                                  </div>
+                                  <div className={`day-record-status ${statusInfo.className}`}>
+                                    <StatusIcon size={14} />
+                                    <span>{statusInfo.label}</span>
+                                  </div>
+                                </div>
+                                
+                                <div className="day-record-times">
+                                  <div className="time-slot">
+                                    <span className="time-label">Entrada</span>
+                                    <span className="time-value">{formatTime(record.entry)}</span>
+                                  </div>
+                                  <div className="time-slot">
+                                    <span className="time-label">Intervalo</span>
+                                    <span className="time-value">
+                                      {formatTime(record.breakStart)} - {formatTime(record.breakEnd)}
+                                    </span>
+                                  </div>
+                                  <div className="time-slot">
+                                    <span className="time-label">Saída</span>
+                                    <span className="time-value">{formatTime(record.exit)}</span>
+                                  </div>
+                                </div>
+                                
+                                <div className="day-record-summary">
+                                  <div className="hours-worked">
+                                    <Clock size={14} />
+                                    <span>{record.workedHours.toFixed(1)}h / {record.requiredHours}h</span>
+                                  </div>
+                                  {record.justification && (
+                                    <div className={`justification-badge ${record.justification.status}`}>
+                                      <FileText size={12} />
+                                      <span>
+                                        {record.justification.type === 'medical_certificate' && 'Atestado'}
+                                        {record.justification.type === 'vacation' && 'Férias'}
+                                        {record.justification.type === 'time_adjustment' && 'Ajuste'}
+                                        {' - '}
+                                        {record.justification.status === 'approved' && 'Aprovado'}
+                                        {record.justification.status === 'pending' && 'Pendente'}
+                                        {record.justification.status === 'rejected' && 'Rejeitado'}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Detail Panel */}
+                  {selectedDayRecord && (
+                    <div className="day-detail-panel">
+                      <div className="detail-panel-header">
+                        <h3>Detalhes do Ponto</h3>
+                        <button 
+                          className="close-detail-btn"
+                          onClick={() => setSelectedDayRecord(null)}
+                        >
+                          <XCircle size={20} />
+                        </button>
+                      </div>
+                      
+                      <div className="detail-panel-content">
+                        <div className="detail-info">
+                          <User size={18} />
+                          <div>
+                            <strong>{selectedDayRecord.userName}</strong>
+                            <span>{formatDate(selectedDayRecord.date)}</span>
                           </div>
-                        );
-                      })}
+                        </div>
+                        
+                        <div className="detail-times-grid">
+                          <div className="detail-time-card">
+                            <span className="detail-time-label">Entrada</span>
+                            <span className="detail-time-value">{formatTime(selectedDayRecord.entry)}</span>
+                          </div>
+                          <div className="detail-time-card">
+                            <span className="detail-time-label">Início Intervalo</span>
+                            <span className="detail-time-value">{formatTime(selectedDayRecord.breakStart)}</span>
+                          </div>
+                          <div className="detail-time-card">
+                            <span className="detail-time-label">Fim Intervalo</span>
+                            <span className="detail-time-value">{formatTime(selectedDayRecord.breakEnd)}</span>
+                          </div>
+                          <div className="detail-time-card">
+                            <span className="detail-time-label">Saída</span>
+                            <span className="detail-time-value">{formatTime(selectedDayRecord.exit)}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="detail-summary">
+                          <div className="summary-row">
+                            <span>Horas Trabalhadas</span>
+                            <strong>{selectedDayRecord.workedHours.toFixed(2)}h</strong>
+                          </div>
+                          <div className="summary-row">
+                            <span>Horas Requeridas</span>
+                            <strong>{selectedDayRecord.requiredHours}h</strong>
+                          </div>
+                          <div className="summary-row">
+                            <span>Diferença</span>
+                            <strong className={selectedDayRecord.workedHours >= selectedDayRecord.requiredHours ? 'positive' : 'negative'}>
+                              {(selectedDayRecord.workedHours - selectedDayRecord.requiredHours).toFixed(2)}h
+                            </strong>
+                          </div>
+                        </div>
+                        
+                        {selectedDayRecord.justification && (
+                          <div className="detail-justification">
+                            <h4>Justificativa</h4>
+                            <div className={`justification-detail ${selectedDayRecord.justification.status}`}>
+                              <div className="justification-type">
+                                <FileText size={16} />
+                                <span>
+                                  {selectedDayRecord.justification.type === 'medical_certificate' && 'Atestado Médico'}
+                                  {selectedDayRecord.justification.type === 'vacation' && 'Férias'}
+                                  {selectedDayRecord.justification.type === 'time_adjustment' && 'Ajuste de Horário'}
+                                </span>
+                              </div>
+                              <p>{selectedDayRecord.justification.description}</p>
+                              <span className={`justification-status ${selectedDayRecord.justification.status}`}>
+                                {selectedDayRecord.justification.status === 'approved' && 'Aprovado pelo RH'}
+                                {selectedDayRecord.justification.status === 'pending' && 'Aguardando Aprovação'}
+                                {selectedDayRecord.justification.status === 'rejected' && 'Rejeitado pelo RH'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {selectedDayRecord.hasError && !selectedDayRecord.justification && (
+                          <div className="detail-error">
+                            <AlertCircle size={16} />
+                            <span>Este registro possui inconsistências não justificadas</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </>
-              )}
-
-              {/* Detail Panel */}
-              {selectedDayRecord && (
-                <div className="day-detail-panel">
-                  <div className="detail-panel-header">
-                    <h3>Detalhes do Ponto</h3>
-                    <button 
-                      className="close-detail-btn"
-                      onClick={() => setSelectedDayRecord(null)}
-                    >
-                      <XCircle size={20} />
-                    </button>
-                  </div>
-                  
-                  <div className="detail-panel-content">
-                    <div className="detail-info">
-                      <User size={18} />
-                      <div>
-                        <strong>{selectedDayRecord.userName}</strong>
-                        <span>{formatDate(selectedDayRecord.date)}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="detail-times-grid">
-                      <div className="detail-time-card">
-                        <span className="detail-time-label">Entrada</span>
-                        <span className="detail-time-value">{formatTime(selectedDayRecord.entry)}</span>
-                      </div>
-                      <div className="detail-time-card">
-                        <span className="detail-time-label">Início Intervalo</span>
-                        <span className="detail-time-value">{formatTime(selectedDayRecord.breakStart)}</span>
-                      </div>
-                      <div className="detail-time-card">
-                        <span className="detail-time-label">Fim Intervalo</span>
-                        <span className="detail-time-value">{formatTime(selectedDayRecord.breakEnd)}</span>
-                      </div>
-                      <div className="detail-time-card">
-                        <span className="detail-time-label">Saída</span>
-                        <span className="detail-time-value">{formatTime(selectedDayRecord.exit)}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="detail-summary">
-                      <div className="summary-row">
-                        <span>Horas Trabalhadas</span>
-                        <strong>{selectedDayRecord.workedHours.toFixed(2)}h</strong>
-                      </div>
-                      <div className="summary-row">
-                        <span>Horas Requeridas</span>
-                        <strong>{selectedDayRecord.requiredHours}h</strong>
-                      </div>
-                      <div className="summary-row">
-                        <span>Diferença</span>
-                        <strong className={selectedDayRecord.workedHours >= selectedDayRecord.requiredHours ? 'positive' : 'negative'}>
-                          {(selectedDayRecord.workedHours - selectedDayRecord.requiredHours).toFixed(2)}h
-                        </strong>
-                      </div>
-                    </div>
-                    
-                    {selectedDayRecord.justification && (
-                      <div className="detail-justification">
-                        <h4>Justificativa</h4>
-                        <div className={`justification-detail ${selectedDayRecord.justification.status}`}>
-                          <div className="justification-type">
-                            <FileText size={16} />
-                            <span>
-                              {selectedDayRecord.justification.type === 'medical_certificate' && 'Atestado Médico'}
-                              {selectedDayRecord.justification.type === 'vacation' && 'Férias'}
-                              {selectedDayRecord.justification.type === 'time_adjustment' && 'Ajuste de Horário'}
-                            </span>
-                          </div>
-                          <p>{selectedDayRecord.justification.description}</p>
-                          <span className={`justification-status ${selectedDayRecord.justification.status}`}>
-                            {selectedDayRecord.justification.status === 'approved' && 'Aprovado pelo RH'}
-                            {selectedDayRecord.justification.status === 'pending' && 'Aguardando Aprovação'}
-                            {selectedDayRecord.justification.status === 'rejected' && 'Rejeitado pelo RH'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {selectedDayRecord.hasError && !selectedDayRecord.justification && (
-                      <div className="detail-error">
-                        <AlertCircle size={16} />
-                        <span>Este registro possui inconsistências não justificadas</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
               )}
             </div>
           </>
@@ -667,32 +698,36 @@ export default function AdminDashboard() {
         {activeTab === 'usuarios' && (
           <div className="users-card">
             <h2 className="users-title">Usuários do Sistema</h2>
-            <table className="users-table">
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Email</th>
-                  <th>Departamento</th>
-                  <th>Perfil</th>
-                  <th>Modo de Trabalho</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mockUsers.map((user) => (
-                  <tr key={user.id}>
-                    <td>{user.name}</td>
-                    <td>{user.email}</td>
-                    <td>{user.department}</td>
-                    <td>
-                      <span className="user-role-badge">{roleLabels[user.role]}</span>
-                    </td>
-                    <td>
-                      <span className="user-workmode-badge">{workModeLabels[user.workMode]}</span>
-                    </td>
+            {isLoading ? (
+              <div className="records-empty">Carregando...</div>
+            ) : (
+              <table className="users-table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Email</th>
+                    <th>Perfil</th>
+                    <th>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {users.map((user) => (
+                    <tr key={user.id}>
+                      <td>{user.fullName}</td>
+                      <td>{user.email}</td>
+                      <td>
+                        <span className="user-role-badge">{roleLabels[user.role]}</span>
+                      </td>
+                      <td>
+                        <span className={`user-status-badge ${user.status.toLowerCase()}`}>
+                          {statusLabels[user.status]}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
 
@@ -708,39 +743,43 @@ export default function AdminDashboard() {
               </div>
             </div>
             
-            <div className="schedules-grid">
-              {mockWorkSchedules.map((schedule, index) => (
-                <div 
-                  key={schedule.id} 
-                  className="schedule-card"
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                >
-                  <div className="schedule-card-header">
-                    <div className="schedule-card-icon">
-                      <Calendar size={20} />
+            {isLoading ? (
+              <div className="records-empty">Carregando...</div>
+            ) : (
+              <div className="schedules-grid">
+                {workSchedules.map((schedule, index) => (
+                  <div 
+                    key={schedule.id} 
+                    className="schedule-card"
+                    style={{ animationDelay: `${index * 0.1}s` }}
+                  >
+                    <div className="schedule-card-header">
+                      <div className="schedule-card-icon">
+                        <Calendar size={20} />
+                      </div>
+                      <span className="schedule-badge">{Math.floor(schedule.dailyHoursTarget / 60)}h</span>
                     </div>
-                    <span className="schedule-badge">{schedule.hoursPerDay}h</span>
-                  </div>
-                  
-                  <h3 className="schedule-card-name">{schedule.name}</h3>
-                  
-                  <div className="schedule-card-details">
-                    <div className="schedule-detail">
-                      <Clock size={14} />
-                      <span>{schedule.hoursPerDay} horas por dia</span>
+                    
+                    <h3 className="schedule-card-name">{schedule.name}</h3>
+                    
+                    <div className="schedule-card-details">
+                      <div className="schedule-detail">
+                        <Clock size={14} />
+                        <span>{Math.floor(schedule.dailyHoursTarget / 60)} horas por dia</span>
+                      </div>
+                      <div className="schedule-detail">
+                        <AlertCircle size={14} />
+                        <span>Tolerância: {schedule.toleranceMinutes} minutos</span>
+                      </div>
                     </div>
-                    <div className="schedule-detail">
-                      <AlertCircle size={14} />
-                      <span>Tolerância: {schedule.toleranceMinutes} minutos</span>
+                    
+                    <div className="schedule-card-footer">
+                      <span className="schedule-status active">Ativo</span>
                     </div>
                   </div>
-                  
-                  <div className="schedule-card-footer">
-                    <span className="schedule-status active">Ativo</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>

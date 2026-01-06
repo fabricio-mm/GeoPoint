@@ -1,0 +1,153 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: hsl(var(--background) / 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-content {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  width: 100%;
+  max-width: 480px;
+  margin: 1rem;
+  box-shadow: 0 25px 50px -12px hsl(var(--foreground) / 0.25);
+  animation: slideUp 0.3s ease-out;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.modal-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: transparent;
+  border: none;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-close-btn:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.modal-form {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: hsl(var(--foreground));
+}
+
+.char-count {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  text-align: right;
+}
+
+.switch-group {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: hsl(var(--muted) / 0.5);
+  border-radius: 0.75rem;
+}
+
+.switch-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.switch-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+  border-radius: 0.5rem;
+}
+
+.switch-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.switch-text label {
+  margin: 0;
+}
+
+.switch-description {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.select-item-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

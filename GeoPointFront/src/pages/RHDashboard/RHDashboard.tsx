@@ -1,36 +1,93 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Filter, X, User, FileText, CalendarDays, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import Header from '@/components/Header/Header';
-import { mockRequests } from '@/data/mockData';
-import { Request } from '@/types';
+import { requestsApi, Request as ApiRequest, usersApi, User as ApiUser } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import './RHDashboard.css';
+
+interface DisplayRequest {
+  id: string;
+  requesterId: string;
+  userName: string;
+  type: string;
+  status: string;
+  description: string;
+  containsProof: boolean;
+  targetDate?: string;
+  createdAt?: string;
+}
 
 const requestTypeLabels: Record<string, string> = {
   medical_certificate: 'Atestado Médico',
   vacation: 'Férias',
   time_adjustment: 'Ajuste de Ponto',
+  CERTIFICATE: 'Atestado Médico',
+  FORGOT_PUNCH: 'Esquecimento de Ponto',
+  VACATION: 'Férias',
 };
 
 const statusLabels: Record<string, string> = {
   pending: 'Pendente',
   approved: 'Aprovado',
   rejected: 'Rejeitado',
+  PENDING: 'Pendente',
+  APPROVED: 'Aprovado',
+  REJECTED: 'Rejeitado',
 };
 
 export default function RHDashboard() {
-  const [requests, setRequests] = useState<Request[]>(mockRequests);
+  const { user } = useAuth();
+  const [requests, setRequests] = useState<DisplayRequest[]>([]);
+  const [users, setUsers] = useState<Map<string, ApiUser>>(new Map());
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<DisplayRequest | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const pendingCount = requests.filter(r => r.status === 'pending').length;
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Load users first for name mapping
+      const usersData = await usersApi.getAll();
+      const usersMap = new Map(usersData.map(u => [u.id, u]));
+      setUsers(usersMap);
+
+      // Load pending requests
+      const pendingRequests = await requestsApi.getPending();
+      const mappedRequests: DisplayRequest[] = pendingRequests.map(r => ({
+        id: r.id,
+        requesterId: r.requesterId,
+        userName: r.requester?.fullName || usersMap.get(r.requesterId)?.fullName || 'Usuário',
+        type: r.type,
+        status: r.status,
+        description: r.justificationUser,
+        containsProof: r.containsProof,
+        targetDate: r.targetDate,
+        createdAt: r.createdAt,
+      }));
+      
+      setRequests(mappedRequests);
+    } catch (err) {
+      console.error('Error loading data:', err);
+      toast.error('Erro ao carregar solicitações');
+    }
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const pendingCount = requests.filter(r => r.status === 'PENDING' || r.status === 'pending').length;
 
   const filteredRequests = requests.filter(request => {
     if (statusFilter === 'all') return true;
-    return request.status === statusFilter;
+    return request.status.toLowerCase() === statusFilter;
   });
 
-  const formatDate = (date: Date) => {
+  const formatDate = (dateStr: string | undefined) => {
+    if (!dateStr) return '--/--/----';
+    const date = new Date(dateStr);
     return date.toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
@@ -38,20 +95,44 @@ export default function RHDashboard() {
     });
   };
 
-  const handleApprove = (requestId: string) => {
-    setRequests(prev => 
-      prev.map(r => r.id === requestId ? { ...r, status: 'approved' as const } : r)
-    );
-    setSelectedRequest(null);
-    toast.success('Solicitação aprovada com sucesso!');
+  const handleApprove = async (requestId: string) => {
+    if (!user) return;
+    
+    try {
+      await requestsApi.review(requestId, {
+        reviewerId: user.id,
+        newStatus: 'APPROVED',
+      });
+      
+      setRequests(prev => 
+        prev.map(r => r.id === requestId ? { ...r, status: 'APPROVED' } : r)
+      );
+      setSelectedRequest(null);
+      toast.success('Solicitação aprovada com sucesso!');
+    } catch (err) {
+      console.error('Error approving request:', err);
+      toast.error('Erro ao aprovar solicitação');
+    }
   };
 
-  const handleReject = (requestId: string) => {
-    setRequests(prev => 
-      prev.map(r => r.id === requestId ? { ...r, status: 'rejected' as const } : r)
-    );
-    setSelectedRequest(null);
-    toast.error('Solicitação rejeitada');
+  const handleReject = async (requestId: string) => {
+    if (!user) return;
+    
+    try {
+      await requestsApi.review(requestId, {
+        reviewerId: user.id,
+        newStatus: 'REJECTED',
+      });
+      
+      setRequests(prev => 
+        prev.map(r => r.id === requestId ? { ...r, status: 'REJECTED' } : r)
+      );
+      setSelectedRequest(null);
+      toast.error('Solicitação rejeitada');
+    } catch (err) {
+      console.error('Error rejecting request:', err);
+      toast.error('Erro ao rejeitar solicitação');
+    }
   };
 
   return (
@@ -88,62 +169,72 @@ export default function RHDashboard() {
             </select>
           </div>
 
-          {filteredRequests.length === 0 ? (
+          {isLoading ? (
+            <div className="rh-requests-empty">Carregando...</div>
+          ) : filteredRequests.length === 0 ? (
             <div className="rh-requests-empty">Nenhuma solicitação encontrada</div>
           ) : (
             <div className="rh-requests-list">
-              {filteredRequests.map((request, index) => (
-                <div 
-                  key={request.id} 
-                  className={`rh-request-card ${request.status}`}
-                  style={{ animationDelay: `${index * 0.05}s` }}
-                >
-                  <div className="rh-request-card-left">
-                    <div className={`rh-request-type-badge ${request.type}`}>
-                      <FileText size={14} />
-                    </div>
-                  </div>
-                  
-                  <div className="rh-request-card-content">
-                    <div className="rh-request-card-header">
-                      <div className="rh-request-card-info">
-                        <h4 className="rh-request-employee">{request.userName}</h4>
-                        <span className="rh-request-type">{requestTypeLabels[request.type]}</span>
+              {filteredRequests.map((request, index) => {
+                const status = request.status.toLowerCase();
+                return (
+                  <div 
+                    key={request.id} 
+                    className={`rh-request-card ${status}`}
+                    style={{ animationDelay: `${index * 0.05}s` }}
+                  >
+                    <div className="rh-request-card-left">
+                      <div className={`rh-request-type-badge ${request.type}`}>
+                        <FileText size={14} />
                       </div>
-                      <span className={`rh-request-badge ${request.status}`}>
-                        {request.status === 'pending' && <Clock size={12} />}
-                        {request.status === 'approved' && <CheckCircle2 size={12} />}
-                        {request.status === 'rejected' && <XCircle size={12} />}
-                        {statusLabels[request.status]}
-                      </span>
                     </div>
                     
-                    <p className="rh-request-description">{request.description}</p>
-                    
-                    <div className="rh-request-meta">
-                      <div className="rh-request-date-item">
-                        <CalendarDays size={14} />
-                        <span>Referência: <strong>{formatDate(request.referenceDate)}</strong></span>
+                    <div className="rh-request-card-content">
+                      <div className="rh-request-card-header">
+                        <div className="rh-request-card-info">
+                          <h4 className="rh-request-employee">{request.userName}</h4>
+                          <span className="rh-request-type">{requestTypeLabels[request.type]}</span>
+                        </div>
+                        <span className={`rh-request-badge ${status}`}>
+                          {status === 'pending' && <Clock size={12} />}
+                          {status === 'approved' && <CheckCircle2 size={12} />}
+                          {status === 'rejected' && <XCircle size={12} />}
+                          {statusLabels[request.status]}
+                        </span>
                       </div>
-                      <div className="rh-request-date-item">
-                        <Clock size={14} />
-                        <span>Solicitado: <strong>{formatDate(request.requestDate)}</strong></span>
+                      
+                      <p className="rh-request-description">{request.description}</p>
+                      
+                      <div className="rh-request-meta">
+                        {request.targetDate && (
+                          <div className="rh-request-date-item">
+                            <CalendarDays size={14} />
+                            <span>Referência: <strong>{formatDate(request.targetDate)}</strong></span>
+                          </div>
+                        )}
+                        <div className="rh-request-date-item">
+                          <Clock size={14} />
+                          <span>Solicitado: <strong>{formatDate(request.createdAt)}</strong></span>
+                        </div>
+                        {request.containsProof && (
+                          <span className="rh-request-proof">📎 Contém comprovante</span>
+                        )}
                       </div>
                     </div>
-                  </div>
 
-                  {request.status === 'pending' && (
-                    <div className="rh-request-card-action">
-                      <button
-                        className="rh-analyze-btn"
-                        onClick={() => setSelectedRequest(request)}
-                      >
-                        Analisar
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    {status === 'pending' && (
+                      <div className="rh-request-card-action">
+                        <button
+                          className="rh-analyze-btn"
+                          onClick={() => setSelectedRequest(request)}
+                        >
+                          Analisar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -186,7 +277,7 @@ export default function RHDashboard() {
                     </div>
                     <div>
                       <span className="rh-modal-label">Data de Referência</span>
-                      <span className="rh-modal-value">{formatDate(selectedRequest.referenceDate)}</span>
+                      <span className="rh-modal-value">{formatDate(selectedRequest.targetDate)}</span>
                     </div>
                   </div>
                   <div className="rh-modal-field">
@@ -195,7 +286,7 @@ export default function RHDashboard() {
                     </div>
                     <div>
                       <span className="rh-modal-label">Data da Solicitação</span>
-                      <span className="rh-modal-value">{formatDate(selectedRequest.requestDate)}</span>
+                      <span className="rh-modal-value">{formatDate(selectedRequest.createdAt)}</span>
                     </div>
                   </div>
                 </div>
@@ -204,6 +295,12 @@ export default function RHDashboard() {
                   <span className="rh-modal-label">Descrição / Justificativa</span>
                   <p className="rh-modal-description-text">{selectedRequest.description}</p>
                 </div>
+
+                {selectedRequest.containsProof && (
+                  <div className="rh-modal-proof">
+                    📎 Esta solicitação contém comprovante anexado
+                  </div>
+                )}
               </div>
 
               <div className="rh-modal-status-indicator">

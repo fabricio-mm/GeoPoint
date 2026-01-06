@@ -171,38 +171,77 @@
   background: hsl(var(--destructive) / 0.9);
 }
 
+/* Clock Action Buttons Grid */
+.clock-action-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-top: 1rem;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* Clock Action Button */
 .clock-action-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  padding: 1rem 2.5rem;
-  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.85) 100%);
-  color: hsl(var(--primary-foreground));
-  border: none;
+  gap: 0.5rem;
+  padding: 0.875rem 1rem;
+  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(var(--border));
   border-radius: 12px;
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 16px hsl(var(--primary) / 0.3);
-  margin-top: 0.5rem;
 }
 
 .clock-action-button:hover:not(:disabled) {
+  background: hsl(var(--secondary) / 0.8);
+  border-color: hsl(var(--primary) / 0.3);
+}
+
+.clock-action-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.clock-action-button.suggested {
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.85) 100%);
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+  box-shadow: 0 4px 16px hsl(var(--primary) / 0.3);
+}
+
+.clock-action-button.suggested:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 6px 24px hsl(var(--primary) / 0.4);
 }
 
-.clock-action-button:active:not(:disabled) {
-  transform: translateY(0);
+.clock-action-button.completed {
+  background: hsl(var(--success) / 0.1);
+  color: hsl(var(--success));
+  border-color: hsl(var(--success) / 0.3);
 }
 
-.clock-action-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  box-shadow: none;
+.clock-action-button.completed:disabled {
+  opacity: 0.8;
+}
+
+.clock-action-button.entry.suggested {
+  background: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(142 76% 30%) 100%);
+}
+
+.clock-action-button.exit.suggested {
+  background: linear-gradient(135deg, hsl(var(--destructive)) 0%, hsl(var(--destructive) / 0.85) 100%);
+}
+
+.clock-action-button.break_start.suggested,
+.clock-action-button.break_end.suggested {
+  background: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(38 92% 42%) 100%);
 }
 
 /* Info Cards */
@@ -539,14 +578,31 @@
   color: hsl(var(--primary));
 }
 
-.request-type-icon.vacation {
+.request-type-icon.vacation,
+.request-type-icon.VACATION {
   background: hsl(142 76% 36% / 0.1);
   color: hsl(142 76% 36%);
 }
 
-.request-type-icon.time_adjustment {
+.request-type-icon.time_adjustment,
+.request-type-icon.FORGOT_PUNCH {
   background: hsl(38 92% 50% / 0.1);
   color: hsl(38 92% 50%);
+}
+
+.request-type-icon.CERTIFICATE,
+.request-type-icon.medical_certificate {
+  background: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+}
+
+.request-proof-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: hsl(var(--primary));
+  margin-bottom: 0.5rem;
 }
 
 .request-card-content {

@@ -10,30 +10,40 @@ interface DisplayRequest {
   id: string;
   requesterId: string;
   userName: string;
-  type: string;
-  status: string;
+  type: number | string;
+  status: number | string;
   description: string;
   containsProof: boolean;
   targetDate?: string;
   createdAt?: string;
 }
 
-const requestTypeLabels: Record<string, string> = {
-  medical_certificate: 'Atestado Médico',
-  vacation: 'Férias',
-  time_adjustment: 'Ajuste de Ponto',
+// API  types: 0=CERTIFICATE, 1=FORGOT_PUNCH, 2=VACATION
+const requestTypeLabels: Record<string | number, string> = {
+  0: 'Atestado Médico',
+  1: 'Esquecimento de Ponto',
+  2: 'Férias',
   CERTIFICATE: 'Atestado Médico',
   FORGOT_PUNCH: 'Esquecimento de Ponto',
   VACATION: 'Férias',
 };
 
-const statusLabels: Record<string, string> = {
-  pending: 'Pendente',
-  approved: 'Aprovado',
-  rejected: 'Rejeitado',
+// API  status: 0=PENDING, 1=APPROVED, 2=REJECTED
+const statusLabels: Record<string | number, string> = {
+  0: 'Pendente',
+  1: 'Aprovado',
+  2: 'Rejeitado',
   PENDING: 'Pendente',
   APPROVED: 'Aprovado',
   REJECTED: 'Rejeitado',
+};
+
+// Map numeric status to string for CSS classes
+const statusToString = (status: number | string): string => {
+  if (typeof status === 'number') {
+    return ['pending', 'approved', 'rejected'][status] || 'pending';
+  }
+  return status.toString().toLowerCase();
 };
 
 export default function RHDashboard() {
@@ -78,11 +88,11 @@ export default function RHDashboard() {
     loadData();
   }, [loadData]);
 
-  const pendingCount = requests.filter(r => r.status === 'PENDING' || r.status === 'pending').length;
+  const pendingCount = requests.filter(r => statusToString(r.status) === 'pending').length;
 
   const filteredRequests = requests.filter(request => {
     if (statusFilter === 'all') return true;
-    return request.status.toLowerCase() === statusFilter;
+    return statusToString(request.status) === statusFilter;
   });
 
   const formatDate = (dateStr: string | undefined) => {
@@ -105,7 +115,7 @@ export default function RHDashboard() {
       });
       
       setRequests(prev => 
-        prev.map(r => r.id === requestId ? { ...r, status: 'APPROVED' } : r)
+        prev.map(r => r.id === requestId ? { ...r, status: 1 } : r) // 1 = APPROVED
       );
       setSelectedRequest(null);
       toast.success('Solicitação aprovada com sucesso!');
@@ -125,7 +135,7 @@ export default function RHDashboard() {
       });
       
       setRequests(prev => 
-        prev.map(r => r.id === requestId ? { ...r, status: 'REJECTED' } : r)
+        prev.map(r => r.id === requestId ? { ...r, status: 2 } : r) // 2 = REJECTED
       );
       setSelectedRequest(null);
       toast.error('Solicitação rejeitada');
@@ -175,8 +185,8 @@ export default function RHDashboard() {
             <div className="rh-requests-empty">Nenhuma solicitação encontrada</div>
           ) : (
             <div className="rh-requests-list">
-              {filteredRequests.map((request, index) => {
-                const status = request.status.toLowerCase();
+            {filteredRequests.map((request, index) => {
+                const status = statusToString(request.status);
                 return (
                   <div 
                     key={request.id} 

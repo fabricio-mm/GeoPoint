@@ -8,27 +8,17 @@ import './AdminDashboard.css';
 type TabType = 'apontamentos' | 'usuarios' | 'jornadas';
 type PeriodFilter = 'day' | 'week' | 'month';
 
-const typeLabels: Record<string, string> = {
-  entry: 'Entrada',
-  exit: 'Saída',
-  break_start: 'Início Intervalo',
-  break_end: 'Fim Intervalo',
-  ENTRY: 'Entrada',
-  EXIT: 'Saída',
-};
+
 
 const roleLabels: Record<string, string> = {
-  admin: 'Administrador',
-  rh_analyst: 'RH Analyst',
-  employee: 'Funcionário',
-  ADMIN: 'Administrador',
-  HR: 'Analista RH',
-  EMPLOYEE: 'Funcionário',
+  3: 'Administrador',
+  2: 'Analista RH',
+  1: 'Funcionário',
 };
 
 const statusLabels: Record<string, string> = {
-  ACTIVE: 'Ativo',
-  INACTIVE: 'Inativo',
+  1: 'Ativo',
+  2: 'Inativo',
 };
 
 interface DayRecord {
@@ -101,6 +91,8 @@ export default function AdminDashboard() {
     loadData();
   }, [loadData]);
 
+console.log('users', users)
+
   const totalUsers = users.length;
   const activeUsers = users.filter(u => u.status === 'ACTIVE').length;
   const totalRecords = timeEntries.length;
@@ -116,7 +108,8 @@ export default function AdminDashboard() {
     const usersMap = new Map(users.map(u => [u.id, u]));
     
     timeEntries.forEach(record => {
-      const timestamp = record.createdAt ? new Date(record.createdAt) : new Date();
+      
+      const timestamp = new Date(record.timestampUtc);
       const dateStr = timestamp.toDateString();
       const key = `${record.userId}-${dateStr}`;
       const user = usersMap.get(record.userId);
@@ -137,13 +130,13 @@ export default function AdminDashboard() {
       const dayRecord = recordsMap.get(key)!;
       
       // Map API type to local type
-      if (record.type === 'ENTRY') {
+      if (record.type === 1) {
         if (!dayRecord.entry) {
           dayRecord.entry = timestamp;
         } else if (!dayRecord.breakEnd) {
           dayRecord.breakEnd = timestamp;
         }
-      } else if (record.type === 'EXIT') {
+      } else if (record.type === 2) {
         if (!dayRecord.breakStart && dayRecord.entry) {
           dayRecord.breakStart = timestamp;
         } else {
@@ -719,7 +712,7 @@ export default function AdminDashboard() {
                         <span className="user-role-badge">{roleLabels[user.role]}</span>
                       </td>
                       <td>
-                        <span className={`user-status-badge ${user.status.toLowerCase()}`}>
+                        <span className={`user-status-badge`}>
                           {statusLabels[user.status]}
                         </span>
                       </td>
@@ -757,7 +750,7 @@ export default function AdminDashboard() {
                       <div className="schedule-card-icon">
                         <Calendar size={20} />
                       </div>
-                      <span className="schedule-badge">{Math.floor(schedule.dailyHoursTarget / 60)}h</span>
+                      <span className="schedule-badge">{schedule.dailyHoursTarget} h</span>
                     </div>
                     
                     <h3 className="schedule-card-name">{schedule.name}</h3>
@@ -765,7 +758,7 @@ export default function AdminDashboard() {
                     <div className="schedule-card-details">
                       <div className="schedule-detail">
                         <Clock size={14} />
-                        <span>{Math.floor(schedule.dailyHoursTarget / 60)} horas por dia</span>
+                        <span>{schedule.dailyHoursTarget} horas por dia</span>
                       </div>
                       <div className="schedule-detail">
                         <AlertCircle size={14} />

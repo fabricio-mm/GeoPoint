@@ -2,7 +2,7 @@ import { User, TimeRecord, Request, WorkSchedule } from '@/types';
 
 export const mockUsers: User[] = [
   {
-    id: '1',
+    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
     name: 'João Silva',
     email: 'admin@geopoint.com',
     role: 'admin',
@@ -11,7 +11,7 @@ export const mockUsers: User[] = [
     registeredLocation: { lat: -23.5505, lng: -46.6333, address: 'Av. Paulista, 1000 - São Paulo' }
   },
   {
-    id: '2',
+    id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
     name: 'Maria Santos',
     email: 'rh@geopoint.com',
     role: 'rh_analyst',
@@ -20,41 +20,32 @@ export const mockUsers: User[] = [
     registeredLocation: { lat: -23.5505, lng: -46.6333, address: 'Av. Paulista, 1000 - São Paulo' }
   },
   {
-    id: '3',
+    id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     name: 'Carlos Oliveira',
     email: 'user@geopoint.com',
     role: 'employee',
     department: 'Desenvolvimento',
     workMode: 'home_office',
     registeredLocation: { lat: -23.5489, lng: -46.6388, address: 'Rua Augusta, 500 - São Paulo' }
-  },
-  {
-    id: '4',
-    name: 'Ana Costa',
-    email: 'ana@geopoint.com',
-    role: 'employee',
-    department: 'Marketing',
-    workMode: 'office',
-    registeredLocation: { lat: -23.5505, lng: -46.6333, address: 'Av. Paulista, 1000 - São Paulo' }
-  },
+  }
 ];
 
 export const mockTimeRecords: TimeRecord[] = [
   // Hoje - 28/12
   {
     id: '1',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
-    type: 'entry',
+    type: 1,
     timestamp: new Date('2025-12-28T08:00:00'),
     location: { lat: -23.5489, lng: -46.6388 },
     validated: true
   },
   {
     id: '2',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
-    type: 'break_start',
+    type: 2,
     timestamp: new Date('2025-12-28T12:00:00'),
     location: { lat: -23.5489, lng: -46.6388 },
     validated: true
@@ -62,55 +53,55 @@ export const mockTimeRecords: TimeRecord[] = [
   // Ontem - 27/12
   {
     id: '3',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
-    type: 'entry',
+    type: 1,
     timestamp: new Date('2025-12-27T08:05:00'),
     location: { lat: -23.5489, lng: -46.6388 },
     validated: true
   },
   {
     id: '4',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
-    type: 'break_start',
+    type: 2,
     timestamp: new Date('2025-12-27T12:00:00'),
     location: { lat: -23.5489, lng: -46.6388 },
     validated: true
   },
   {
     id: '5',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
-    type: 'break_end',
+    type: 2,
     timestamp: new Date('2025-12-27T13:00:00'),
     location: { lat: -23.5489, lng: -46.6388 },
     validated: true
   },
   {
     id: '6',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
-    type: 'exit',
+    type: 2,
     timestamp: new Date('2025-12-27T17:00:00'),
     location: { lat: -23.5489, lng: -46.6388 },
     validated: true
   },
-  // 26/12 - Problema não justificado
+  // 26/12 -  não justificado
   {
     id: '7',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
-    type: 'entry',
+    type: 1,
     timestamp: new Date('2025-12-26T10:30:00'),
     location: { lat: -23.5489, lng: -46.6388 },
     validated: false
   },
   {
     id: '8',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
-    type: 'exit',
+    type: 2,
     timestamp: new Date('2025-12-26T15:00:00'),
     location: { lat: -23.5489, lng: -46.6388 },
     validated: true
@@ -118,18 +109,18 @@ export const mockTimeRecords: TimeRecord[] = [
   // 24/12 - Dia OK
   {
     id: '9',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
-    type: 'entry',
+    type: 1,
     timestamp: new Date('2025-12-24T08:00:00'),
     location: { lat: -23.5489, lng: -46.6388 },
     validated: true
   },
   {
     id: '10',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
-    type: 'exit',
+    type: 2,
     timestamp: new Date('2025-12-24T17:00:00'),
     location: { lat: -23.5489, lng: -46.6388 },
     validated: true
@@ -137,18 +128,18 @@ export const mockTimeRecords: TimeRecord[] = [
   // 23/12 - Dia OK
   {
     id: '11',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
-    type: 'entry',
+    type: 1,
     timestamp: new Date('2025-12-23T08:10:00'),
     location: { lat: -23.5489, lng: -46.6388 },
     validated: true
   },
   {
     id: '12',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
-    type: 'exit',
+    type: 2,
     timestamp: new Date('2025-12-23T17:05:00'),
     location: { lat: -23.5489, lng: -46.6388 },
     validated: true
@@ -156,46 +147,27 @@ export const mockTimeRecords: TimeRecord[] = [
   // 22/12 - Problema não justificado
   {
     id: '13',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
-    type: 'entry',
+    type: 1,
     timestamp: new Date('2025-12-22T09:45:00'),
     location: { lat: -23.5489, lng: -46.6388 },
     validated: false
-  },
-  // Outros usuários
-  {
-    id: '14',
-    userId: '4',
-    userName: 'Ana Costa',
-    type: 'entry',
-    timestamp: new Date('2025-12-28T09:15:00'),
-    location: { lat: -23.5505, lng: -46.6333 },
-    validated: true
-  },
+  }
+
 ];
 
 export const mockRequests: Request[] = [
   {
     id: '1',
-    userId: '3',
+    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     userName: 'Carlos Oliveira',
     type: 'medical_certificate',
     status: 'pending',
     description: 'Atestado Teste',
     referenceDate: new Date('2025-12-11'),
     requestDate: new Date('2025-12-13'),
-  },
-  {
-    id: '2',
-    userId: '4',
-    userName: 'Ana Costa',
-    type: 'vacation',
-    status: 'pending',
-    description: 'Férias de fim de ano',
-    referenceDate: new Date('2025-12-20'),
-    requestDate: new Date('2025-12-10'),
-  },
+  }
 ];
 
 export const mockWorkSchedules: WorkSchedule[] = [
@@ -205,7 +177,7 @@ export const mockWorkSchedules: WorkSchedule[] = [
 ];
 
 export const loginCredentials = {
-  'admin@geopoint.com': { password: 'admin123', userId: '1' },
-  'rh@geopoint.com': { password: 'rh123', userId: '2' },
-  'user@geopoint.com': { password: 'user123', userId: '3' },
+  'admin@geopoint.com': { password: 'admin123', userId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+  'rh@geopoint.com': { password: 'rh123', userId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' },
+  'user@geopoint.com': { password: 'user123', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc' },
 };

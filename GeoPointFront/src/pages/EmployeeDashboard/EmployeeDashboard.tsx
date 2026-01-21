@@ -1,53 +1,71 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Clock, History, List, MapPin, Check, Briefcase, Timer, AlertCircle, CalendarDays, FileText, CheckCircle2, XCircle, Plus, LogIn, LogOut, Coffee, UtensilsCrossed } from 'lucide-react';
+import {
+  Clock, History, List, MapPin, Check, Briefcase, Timer, AlertCircle,
+  CalendarDays, FileText, CheckCircle2, XCircle, Plus, LogIn, LogOut,
+  Coffee, UtensilsCrossed
+} from 'lucide-react';
+
 import Header from '@/components/Header/Header';
 import HistoryCalendar from '@/components/HistoryCalendar/HistoryCalendar';
 import NewRequestModal from '@/components/NewRequestModal/NewRequestModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { mockWorkSchedules } from '@/data/mockData';
 import { TimeRecord } from '@/types';
-import { timeEntriesApi, requestsApi, TimeEntry, Request as ApiRequest, TimeEntryType } from '@/services/api';
+import {
+  timeEntriesApi,
+  requestsApi,
+  TimeEntry,
+  TimeEntryType
+} from '@/services/api';
 import { toast } from 'sonner';
 import './EmployeeDashboard.css';
 
 type TabType = 'ponto' | 'historico' | 'solicitacoes';
 type PeriodFilter = 'day' | 'week' | 'month';
 
-const typeLabels: Record<string, string> = {
-  entry: 'Entrada',
-  exit: 'Saída',
-  break_start: 'Início Intervalo',
-  break_end: 'Fim Intervalo',
-  ENTRY: 'Entrada',
-  EXIT: 'Saída',
+
+const ENTRY = 1;
+const EXIT = 2;
+
+type UiTimeType = 1 | 2;
+
+
+const typeLabels: Record<UiTimeType, string> = {
+  1: 'Entrada',
+  2: 'Saída',
+};
+
+const uiToApiType: Record<UiTimeType, TimeEntryType> = {
+  1: ENTRY,
+  2: EXIT
 };
 
 const requestTypeLabels: Record<string, string> = {
-  medical_certificate: 'Atestado Médico',
-  vacation: 'Férias',
-  time_adjustment: 'Ajuste de Ponto',
   CERTIFICATE: 'Atestado Médico',
   FORGOT_PUNCH: 'Esquecimento de Ponto',
   VACATION: 'Férias',
 };
 
 const statusLabels: Record<string, string> = {
-  pending: 'Pendente',
-  approved: 'Aprovado',
-  rejected: 'Rejeitado',
   PENDING: 'Pendente',
   APPROVED: 'Aprovado',
   REJECTED: 'Rejeitado',
 };
 
-// Map API TimeEntry to local TimeRecord format
-const mapTimeEntryToRecord = (entry: TimeEntry, userName: string): TimeRecord => ({
+
+const mapTimeEntryToRecord = (
+  entry: TimeEntry,
+  userName: string
+): TimeRecord => ({
   id: entry.id,
   userId: entry.userId,
   userName,
-  type: entry.type === 'ENTRY' ? 'entry' : 'exit',
+  type: entry.type === ENTRY ? 1 : 2,
   timestamp: entry.createdAt ? new Date(entry.createdAt) : new Date(),
-  location: { lat: entry.latitudeRecorded, lng: entry.longitudeRecorded },
+  location: {
+    lat: entry.latitudeRecorded,
+    lng: entry.longitudeRecorded,
+  },
   validated: true,
 });
 
@@ -62,78 +80,57 @@ interface DisplayRequest {
 
 export default function EmployeeDashboard() {
   const { user } = useAuth();
+
   const [activeTab, setActiveTab] = useState<TabType>('ponto');
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [locationStatus, setLocationStatus] = useState<'checking' | 'success' | 'error'>('checking');
-  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationStatus, setLocationStatus] =
+    useState<'checking' | 'success' | 'error'>('checking');
+  const [currentLocation, setCurrentLocation] =
+    useState<{ lat: number; lng: number } | null>(null);
   const [records, setRecords] = useState<TimeRecord[]>([]);
   const [requests, setRequests] = useState<DisplayRequest[]>([]);
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('day');
   const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
   const schedule = mockWorkSchedules[0];
-
-  const filteredRecords = useMemo(() => {
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfWeek = new Date(startOfDay);
-    startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay());
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    return records.filter(record => {
-      const recordDate = new Date(record.timestamp);
-      switch (periodFilter) {
-        case 'day':
-          return recordDate >= startOfDay;
-        case 'week':
-          return recordDate >= startOfWeek;
-        case 'month':
-          return recordDate >= startOfMonth;
-        default:
-          return true;
-      }
-    });
-  }, [records, periodFilter]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Load data from API
+ 
   const loadData = useCallback(async () => {
     if (!user) return;
-    
+
     setIsLoading(true);
-    try {
-      // Load time entries
-      const entries = await timeEntriesApi.getByUser(user.id);
-      const mappedRecords = entries.map(e => mapTimeEntryToRecord(e, user.name));
-      setRecords(mappedRecords);
-    } catch (err) {
-      console.error('Error loading time entries:', err);
-      // Keep empty array if API fails
-    }
-    
 
     try {
-      // Load requests - using pending endpoint as there's no user-specific endpoint
-      const pendingRequests = await requestsApi.getPending();
-      const userRequests = pendingRequests
-        .filter(r => r.requesterId === user.id)
-        .map(r => ({
-          id: r.id,
-          type: r.type,
-          status: r.status,
-          description: r.justificationUser,
-          containsProof: r.containsProof,
-          createdAt: r.createdAt ? new Date(r.createdAt) : undefined,
-        }));
-      setRequests(userRequests);
-    } catch (err) {
-      console.error('Error loading requests:', err);
+      const entries = await timeEntriesApi.getByUser(user.id);
+      setRecords(entries.map(e => mapTimeEntryToRecord(e, user.name)));
+    } catch (e) {
+      console.error(e);
     }
-    
+
+    try {
+      const pending = await requestsApi.getPending();
+      setRequests(
+        pending
+          .filter(r => r.requesterId === user.id)
+          .map(r => ({
+            id: r.id,
+            type: r.type,
+            status: r.status,
+            description: r.justificationUser,
+            containsProof: r.containsProof,
+            createdAt: r.createdAt ? new Date(r.createdAt) : undefined,
+          }))
+      );
+    } catch (e) {
+      console.error(e);
+    }
+
     setIsLoading(false);
   }, [user]);
 
@@ -141,118 +138,107 @@ export default function EmployeeDashboard() {
     loadData();
   }, [loadData]);
 
-  console.log('requests', requests)
+ const filteredRecords = useMemo(() => {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(startOfDay);
+  startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay());
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  useEffect(() => {
-    const checkLocation = () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setLocationStatus('success');
-            setCurrentLocation({
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            });
-          },
-          () => setLocationStatus('error')
-        );
-      } else {
-        setLocationStatus('error');
-      }
-    };
-    checkLocation();
-  }, []);
+  return records.filter(record => {
+    const recordDate = new Date(record.timestamp);
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', { 
-      weekday: 'long', 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
-    });
-  };
-
-  const formatDateTime = (date: Date) => {
-    return date.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const getTodayRecords = () => {
-    const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    return records.filter(r => new Date(r.timestamp) >= startOfDay);
-  };
-
-  const getNextExpectedType = (): TimeRecord['type'] | null => {
-    const todayRecords = getTodayRecords();
-    if (todayRecords.length === 0) return 'entry';
-    
-    const lastRecord = todayRecords.reduce((latest, record) => 
-      new Date(record.timestamp) > new Date(latest.timestamp) ? record : latest
-    );
-    
-    switch (lastRecord.type) {
-      case 'entry': return 'break_start';
-      case 'break_start': return 'break_end';
-      case 'break_end': return 'exit';
-      case 'exit': return null;
-      default: return 'entry';
+    switch (periodFilter) {
+      case 'day':
+        return recordDate >= startOfDay;
+      case 'week':
+        return recordDate >= startOfWeek;
+      case 'month':
+        return recordDate >= startOfMonth;
+      default:
+        return true;
     }
-  };
+  });
+}, [records, periodFilter]);
 
-  const handleRegisterTime = async (type: TimeRecord['type']) => {
-    if (locationStatus !== 'success' || !currentLocation) {
-      toast.error('Não é possível registrar ponto sem localização válida');
+console.log('filteredRecords', filteredRecords)
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationStatus('error');
       return;
     }
 
-    if (!user) return;
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setLocationStatus('success');
+        setCurrentLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      () => setLocationStatus('error')
+    );
+  }, []);
 
-    // Map local type to API type
-    const apiType: TimeEntryType = type === 'entry' || type === 'break_end' ? 'ENTRY' : 'EXIT';
-    
+  const getTodayRecords = () => {
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return records.filter(r => r.timestamp >= start);
+  };
+
+  const getNextExpectedType = (): UiTimeType | null => {
+    const today = getTodayRecords();
+    if (today.length === 0) return 1;
+
+    const last = today[today.length - 1].type;
+
+    switch (last) {
+      case 1: return 1;
+      case 2: return 2;
+      default: return null;
+    }
+  };
+
+  const handleRegisterTime = async (type: UiTimeType) => {
+    if (!user || !currentLocation || locationStatus !== 'success') {
+      toast.error('Localização inválida');
+      return;
+    }
+
     try {
       await timeEntriesApi.create({
         userId: user.id,
-        type: apiType,
+        type: uiToApiType[type], 
         origin: 'WEB',
         latitude: currentLocation.lat,
         longitude: currentLocation.lng,
       });
 
-      // Create local record for immediate feedback
-      const newRecord: TimeRecord = {
-        id: Date.now().toString(),
-        userId: user.id,
-        userName: user.name,
-        type,
-        timestamp: new Date(),
-        location: currentLocation,
-        validated: true,
-      };
-      
-      setRecords(prev => [newRecord, ...prev]);
-      toast.success(`${typeLabels[type]} registrada com sucesso!`);
-    } catch (err) {
-      console.error('Error registering time:', err);
-      toast.error('Erro ao registrar ponto. Verifique sua localização.');
+      setRecords(prev => [
+        {
+          id: Date.now().toString(),
+          userId: user.id,
+          userName: user.name,
+          type,
+          timestamp: new Date(),
+          location: currentLocation,
+          validated: true,
+        },
+        ...prev,
+      ]);
+
+      toast.success(`${typeLabels[type]} registrada com sucesso`);
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao registrar ponto');
     }
   };
 
-  const isTypeRegisteredToday = (type: TimeRecord['type']) => {
-    return getTodayRecords().some(r => r.type === type);
-  };
+  const isTypeRegisteredToday = (type: UiTimeType) =>
+    getTodayRecords().some(r => r.type === type);
 
   const nextExpectedType = getNextExpectedType();
+
 
   const retryLocation = () => {
     setLocationStatus('checking');
@@ -271,6 +257,29 @@ export default function EmployeeDashboard() {
       }
     }, 500);
   };
+
+  const formatTime = (date: Date) => 
+    { 
+      return date.toLocaleTimeString('pt-BR', 
+        { hour: '2-digit', minute: '2-digit', second: '2-digit' }); 
+      };
+
+
+    const formatDate = (date: Date) => 
+      { return date.toLocaleDateString('pt-BR', 
+        { weekday: 'long', 
+        day: 'numeric',
+        month: 'long', 
+        year: 'numeric' }); 
+      };
+  const formatDateTime = (date: Date) => {
+     return date.toLocaleString('pt-BR', 
+      { day: '2-digit', 
+        month: '2-digit', 
+        year: 'numeric',
+         hour: '2-digit', 
+         minute: '2-digit', }); 
+        };
 
   const handleNewRequest = async (newRequest: DisplayRequest) => {
     setRequests(prev => [newRequest, ...prev]);
@@ -342,33 +351,33 @@ export default function EmployeeDashboard() {
 
               <div className="clock-action-buttons">
                 <button 
-                  className={`clock-action-button entry ${isTypeRegisteredToday('entry') ? 'completed' : nextExpectedType === 'entry' ? 'suggested' : ''}`}
-                  onClick={() => handleRegisterTime('entry')}
-                  disabled={locationStatus !== 'success' || isTypeRegisteredToday('entry')}
+                  className={`clock-action-button entry ${isTypeRegisteredToday(1) ? 'completed' : nextExpectedType === 1 ? 'suggested' : ''}`}
+                  onClick={() => handleRegisterTime(1)}
+                  disabled={locationStatus !== 'success' || isTypeRegisteredToday(1)}
                 >
                   <LogIn size={18} />
                   Entrada
                 </button>
                 <button 
-                  className={`clock-action-button break_start ${isTypeRegisteredToday('break_start') ? 'completed' : nextExpectedType === 'break_start' ? 'suggested' : ''}`}
-                  onClick={() => handleRegisterTime('break_start')}
-                  disabled={locationStatus !== 'success' || isTypeRegisteredToday('break_start') || !isTypeRegisteredToday('entry')}
+                  className={`clock-action-button break_start ${isTypeRegisteredToday(2) ? 'completed' : nextExpectedType === 2 ? 'suggested' : ''}`}
+                  onClick={() => handleRegisterTime(2)}
+                  disabled={locationStatus !== 'success' || isTypeRegisteredToday(2) || !isTypeRegisteredToday(1)}
                 >
                   <UtensilsCrossed size={18} />
                   Início Almoço
                 </button>
                 <button 
-                  className={`clock-action-button break_end ${isTypeRegisteredToday('break_end') ? 'completed' : nextExpectedType === 'break_end' ? 'suggested' : ''}`}
-                  onClick={() => handleRegisterTime('break_end')}
-                  disabled={locationStatus !== 'success' || isTypeRegisteredToday('break_end') || !isTypeRegisteredToday('break_start')}
+                  className={`clock-action-button break_end ${isTypeRegisteredToday(2) ? 'completed' : nextExpectedType === 2 ? 'suggested' : ''}`}
+                  onClick={() => handleRegisterTime(2)}
+                  disabled={locationStatus !== 'success' || isTypeRegisteredToday(2) || !isTypeRegisteredToday(2)}
                 >
                   <Coffee size={18} />
                   Fim Almoço
                 </button>
                 <button 
-                  className={`clock-action-button exit ${isTypeRegisteredToday('exit') ? 'completed' : nextExpectedType === 'exit' ? 'suggested' : ''}`}
-                  onClick={() => handleRegisterTime('exit')}
-                  disabled={locationStatus !== 'success' || isTypeRegisteredToday('exit') || !isTypeRegisteredToday('break_end')}
+                  className={`clock-action-button exit ${isTypeRegisteredToday(2) ? 'completed' : nextExpectedType === 2 ? 'suggested' : ''}`}
+                  onClick={() => handleRegisterTime(2)}
+                  disabled={locationStatus !== 'success' || isTypeRegisteredToday(2) || !isTypeRegisteredToday(2)}
                 >
                   <LogOut size={18} />
                   Saída

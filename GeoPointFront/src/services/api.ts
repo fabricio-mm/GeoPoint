@@ -3,7 +3,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://localhost:714
 // Types
 export type UserRole = 'EMPLOYEE' | 'HR' | 'ADMIN';
 export type LocationType = 'OFFICE' | 'HOME';
-export type TimeEntryType = 'ENTRY' | 'EXIT';
+export type TimeEntryType = 1 | 2;
 export type TimeEntryOrigin = 'WEB' | 'MOBILE';
 export type RequestType = 'CERTIFICATE' | 'FORGOT_PUNCH' | 'VACATION';
 export type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -63,6 +63,7 @@ export interface TimeEntry {
   latitudeRecorded: number;
   longitudeRecorded: number;
   createdAt?: string;
+  timestampUtc: string;
 }
 
 export interface TimeEntryCreate {

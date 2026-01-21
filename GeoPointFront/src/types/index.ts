@@ -19,7 +19,7 @@ export interface TimeRecord {
   id: string;
   userId: string;
   userName: string;
-  type: 'entry' | 'exit' | 'break_start' | 'break_end';
+  type: number;
   timestamp: Date;
   location: {
     lat: number;

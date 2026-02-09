@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Filter, X, User, FileText, CalendarDays, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import Header from '@/components/Header/Header';
-import { requestsApi, Request as ApiRequest, usersApi, User as ApiUser } from '@/services/api';
+import { requestsApi, Request as ApiRequest, usersApi, User as ApiUser, RequestType, RequestStatus } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import './RHDashboard.css';
@@ -10,40 +10,28 @@ interface DisplayRequest {
   id: string;
   requesterId: string;
   userName: string;
-  type: number | string;
-  status: number | string;
+  type: RequestType;
+  status: RequestStatus;
   description: string;
   containsProof: boolean;
   targetDate?: string;
   createdAt?: string;
 }
 
-// API  types: 0=CERTIFICATE, 1=FORGOT_PUNCH, 2=VACATION
-const requestTypeLabels: Record<string | number, string> = {
-  0: 'Atestado Médico',
+const requestTypeLabels: Record<RequestType, string> = {
   1: 'Esquecimento de Ponto',
-  2: 'Férias',
-  CERTIFICATE: 'Atestado Médico',
-  FORGOT_PUNCH: 'Esquecimento de Ponto',
-  VACATION: 'Férias',
+  2: 'Atestado Médico',
+  3: 'Férias',
 };
 
-// API  status: 0=PENDING, 1=APPROVED, 2=REJECTED
-const statusLabels: Record<string | number, string> = {
+const statusLabels: Record<RequestStatus, string> = {
   0: 'Pendente',
   1: 'Aprovado',
   2: 'Rejeitado',
-  PENDING: 'Pendente',
-  APPROVED: 'Aprovado',
-  REJECTED: 'Rejeitado',
 };
 
-// Map numeric status to string for CSS classes
-const statusToString = (status: number | string): string => {
-  if (typeof status === 'number') {
-    return ['pending', 'approved', 'rejected'][status] || 'pending';
-  }
-  return status.toString().toLowerCase();
+const statusCssClass = (status: RequestStatus): string => {
+  return ['pending', 'approved', 'rejected'][status] || 'pending';
 };
 
 export default function RHDashboard() {
@@ -57,12 +45,10 @@ export default function RHDashboard() {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Load users first for name mapping
       const usersData = await usersApi.getAll();
       const usersMap = new Map(usersData.map(u => [u.id, u]));
       setUsers(usersMap);
 
-      // Load pending requests
       const pendingRequests = await requestsApi.getPending();
       const mappedRequests: DisplayRequest[] = pendingRequests.map(r => ({
         id: r.id,
@@ -75,7 +61,7 @@ export default function RHDashboard() {
         targetDate: r.targetDate,
         createdAt: r.createdAt,
       }));
-      
+
       setRequests(mappedRequests);
     } catch (err) {
       console.error('Error loading data:', err);
@@ -88,35 +74,24 @@ export default function RHDashboard() {
     loadData();
   }, [loadData]);
 
-  const pendingCount = requests.filter(r => statusToString(r.status) === 'pending').length;
+  const pendingCount = requests.filter(r => r.status === 0).length;
 
   const filteredRequests = requests.filter(request => {
     if (statusFilter === 'all') return true;
-    return statusToString(request.status) === statusFilter;
+    return statusCssClass(request.status) === statusFilter;
   });
 
   const formatDate = (dateStr: string | undefined) => {
     if (!dateStr) return '--/--/----';
     const date = new Date(dateStr);
-    return date.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   const handleApprove = async (requestId: string) => {
     if (!user) return;
-    
     try {
-      await requestsApi.review(requestId, {
-        reviewerId: user.id,
-        newStatus: 'APPROVED',
-      });
-      
-      setRequests(prev => 
-        prev.map(r => r.id === requestId ? { ...r, status: 1 } : r) // 1 = APPROVED
-      );
+      await requestsApi.review(requestId, { reviewerId: user.id, newStatus: 1 });
+      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 1 as RequestStatus } : r));
       setSelectedRequest(null);
       toast.success('Solicitação aprovada com sucesso!');
     } catch (err) {
@@ -127,16 +102,9 @@ export default function RHDashboard() {
 
   const handleReject = async (requestId: string) => {
     if (!user) return;
-    
     try {
-      await requestsApi.review(requestId, {
-        reviewerId: user.id,
-        newStatus: 'REJECTED',
-      });
-      
-      setRequests(prev => 
-        prev.map(r => r.id === requestId ? { ...r, status: 2 } : r) // 2 = REJECTED
-      );
+      await requestsApi.review(requestId, { reviewerId: user.id, newStatus: 2 });
+      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 2 as RequestStatus } : r));
       setSelectedRequest(null);
       toast.error('Solicitação rejeitada');
     } catch (err) {
@@ -185,20 +153,20 @@ export default function RHDashboard() {
             <div className="rh-requests-empty">Nenhuma solicitação encontrada</div>
           ) : (
             <div className="rh-requests-list">
-            {filteredRequests.map((request, index) => {
-                const status = statusToString(request.status);
+              {filteredRequests.map((request, index) => {
+                const status = statusCssClass(request.status);
                 return (
-                  <div 
-                    key={request.id} 
+                  <div
+                    key={request.id}
                     className={`rh-request-card ${status}`}
                     style={{ animationDelay: `${index * 0.05}s` }}
                   >
                     <div className="rh-request-card-left">
-                      <div className={`rh-request-type-badge ${request.type}`}>
+                      <div className={`rh-request-type-badge ${status}`}>
                         <FileText size={14} />
                       </div>
                     </div>
-                    
+
                     <div className="rh-request-card-content">
                       <div className="rh-request-card-header">
                         <div className="rh-request-card-info">
@@ -212,9 +180,9 @@ export default function RHDashboard() {
                           {statusLabels[request.status]}
                         </span>
                       </div>
-                      
+
                       <p className="rh-request-description">{request.description}</p>
-                      
+
                       <div className="rh-request-meta">
                         {request.targetDate && (
                           <div className="rh-request-date-item">
@@ -320,23 +288,14 @@ export default function RHDashboard() {
             </div>
 
             <div className="rh-modal-actions">
-              <button
-                className="rh-modal-button cancel"
-                onClick={() => setSelectedRequest(null)}
-              >
+              <button className="rh-modal-button cancel" onClick={() => setSelectedRequest(null)}>
                 Cancelar
               </button>
-              <button
-                className="rh-modal-button reject"
-                onClick={() => handleReject(selectedRequest.id)}
-              >
+              <button className="rh-modal-button reject" onClick={() => handleReject(selectedRequest.id)}>
                 <XCircle size={16} />
                 Rejeitar
               </button>
-              <button
-                className="rh-modal-button approve"
-                onClick={() => handleApprove(selectedRequest.id)}
-              >
+              <button className="rh-modal-button approve" onClick={() => handleApprove(selectedRequest.id)}>
                 <CheckCircle2 size={16} />
                 Aprovar
               </button>

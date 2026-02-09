@@ -555,10 +555,6 @@
   border-left: 3px solid hsl(var(--primary));
 }
 
-.request-card.approved {
-  border-left: 3px solid hsl(var(--success));
-}
-
 .request-card.rejected {
   border-left: 3px solid hsl(var(--destructive));
 }

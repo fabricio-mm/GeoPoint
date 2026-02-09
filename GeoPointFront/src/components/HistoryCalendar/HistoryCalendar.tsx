@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Clock, XCircle } from 'lucide-react';
-import { TimeRecord } from '@/types';
+import { TimeRecord, TimeRecordType } from '@/types';
 import './HistoryCalendar.css';
 
 interface HistoryCalendarProps {
@@ -10,11 +10,12 @@ interface HistoryCalendarProps {
 
 type DayStatus = 'ok' | 'error' | 'pending' | 'empty' | 'future';
 
-const typeLabels: Record<string, string> = {
-  entry: 'Entrada',
-  exit: 'Saída',
-  break_start: 'Início Intervalo',
-  break_end: 'Fim Intervalo',
+const ENTRY = 1;
+const EXIT = 2;
+
+const typeLabels: Record<TimeRecordType, string> = {
+  1: 'Entrada',
+  2: 'Saída',
 };
 
 const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -57,8 +58,8 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
     
     // Check if it's today and incomplete
     if (dateOnly.getTime() === today.getTime()) {
-      const hasEntry = dayRecords.some(r => r.type === 'entry');
-      const hasExit = dayRecords.some(r => r.type === 'exit');
+      const hasEntry = dayRecords.some(r => r.type === ENTRY);
+      const hasExit = dayRecords.some(r => r.type === EXIT);
       if (hasEntry && !hasExit) return 'pending';
     }
     
@@ -159,6 +160,16 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
     return d.getTime() === s.getTime();
   };
 
+  /** Derive a display label based on position in the day's sequence */
+  const getRecordLabel = (record: TimeRecord, dayRecords: TimeRecord[]): string => {
+    const sorted = [...dayRecords].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    const index = sorted.findIndex(r => r.id === record.id);
+    // Typical 4-punch day: Entry, Break Start, Break End, Exit
+    const labels = ['Entrada', 'Início Intervalo', 'Fim Intervalo', 'Saída'];
+    if (index >= 0 && index < labels.length) return labels[index];
+    return typeLabels[record.type];
+  };
+
   return (
     <div className="history-calendar">
       <div className="calendar-header">
@@ -196,7 +207,7 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
                       {dayRecords.slice(0, 2).map((record, i) => (
                         <div key={i} className="week-day-record-item">
                           <span className="record-type-dot"></span>
-                          <span>{typeLabels[record.type]}</span>
+                          <span>{getRecordLabel(record, dayRecords)}</span>
                           <span className="record-time">{formatTime(record.timestamp)}</span>
                         </div>
                       ))}
@@ -279,27 +290,31 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
               </div>
             ) : (
               <div className="detail-panel-records">
-                {getSelectedDayRecords().map((record, index) => (
-                  <div 
-                    key={record.id} 
-                    className={`detail-record-card ${record.type}`}
-                    style={{ animationDelay: `${index * 0.05}s` }}
-                  >
-                    <div className={`detail-record-icon ${record.type}`}>
-                      <Clock size={16} />
+                {getSelectedDayRecords().map((record, index) => {
+                  const dayRecords = getSelectedDayRecords();
+                  const label = getRecordLabel(record, dayRecords);
+                  return (
+                    <div 
+                      key={record.id} 
+                      className={`detail-record-card type-${record.type}`}
+                      style={{ animationDelay: `${index * 0.05}s` }}
+                    >
+                      <div className={`detail-record-icon type-${record.type}`}>
+                        <Clock size={16} />
+                      </div>
+                      <div className="detail-record-info">
+                        <span className="detail-record-type">{label}</span>
+                        <span className="detail-record-time">{formatTime(record.timestamp)}</span>
+                      </div>
+                      {!record.validated && (
+                        <span className="detail-record-badge error">
+                          <XCircle size={12} />
+                          Erro
+                        </span>
+                      )}
                     </div>
-                    <div className="detail-record-info">
-                      <span className="detail-record-type">{typeLabels[record.type]}</span>
-                      <span className="detail-record-time">{formatTime(record.timestamp)}</span>
-                    </div>
-                    {!record.validated && (
-                      <span className="detail-record-badge error">
-                        <XCircle size={12} />
-                        Erro
-                      </span>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -32,129 +32,24 @@ export const mockUsers: User[] = [
 
 export const mockTimeRecords: TimeRecord[] = [
   // Hoje - 28/12
-  {
-    id: '1',
-    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    userName: 'Carlos Oliveira',
-    type: 1,
-    timestamp: new Date('2025-12-28T08:00:00'),
-    location: { lat: -23.5489, lng: -46.6388 },
-    validated: true
-  },
-  {
-    id: '2',
-    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    userName: 'Carlos Oliveira',
-    type: 2,
-    timestamp: new Date('2025-12-28T12:00:00'),
-    location: { lat: -23.5489, lng: -46.6388 },
-    validated: true
-  },
+  { id: '1', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', userName: 'Carlos Oliveira', type: 1, timestamp: new Date('2025-12-28T08:00:00'), location: { lat: -23.5489, lng: -46.6388 }, validated: true },
+  { id: '2', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', userName: 'Carlos Oliveira', type: 2, timestamp: new Date('2025-12-28T12:00:00'), location: { lat: -23.5489, lng: -46.6388 }, validated: true },
   // Ontem - 27/12
-  {
-    id: '3',
-    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    userName: 'Carlos Oliveira',
-    type: 1,
-    timestamp: new Date('2025-12-27T08:05:00'),
-    location: { lat: -23.5489, lng: -46.6388 },
-    validated: true
-  },
-  {
-    id: '4',
-    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    userName: 'Carlos Oliveira',
-    type: 2,
-    timestamp: new Date('2025-12-27T12:00:00'),
-    location: { lat: -23.5489, lng: -46.6388 },
-    validated: true
-  },
-  {
-    id: '5',
-    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    userName: 'Carlos Oliveira',
-    type: 2,
-    timestamp: new Date('2025-12-27T13:00:00'),
-    location: { lat: -23.5489, lng: -46.6388 },
-    validated: true
-  },
-  {
-    id: '6',
-    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    userName: 'Carlos Oliveira',
-    type: 2,
-    timestamp: new Date('2025-12-27T17:00:00'),
-    location: { lat: -23.5489, lng: -46.6388 },
-    validated: true
-  },
-  // 26/12 -  não justificado
-  {
-    id: '7',
-    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    userName: 'Carlos Oliveira',
-    type: 1,
-    timestamp: new Date('2025-12-26T10:30:00'),
-    location: { lat: -23.5489, lng: -46.6388 },
-    validated: false
-  },
-  {
-    id: '8',
-    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    userName: 'Carlos Oliveira',
-    type: 2,
-    timestamp: new Date('2025-12-26T15:00:00'),
-    location: { lat: -23.5489, lng: -46.6388 },
-    validated: true
-  },
-  // 24/12 - Dia OK
-  {
-    id: '9',
-    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    userName: 'Carlos Oliveira',
-    type: 1,
-    timestamp: new Date('2025-12-24T08:00:00'),
-    location: { lat: -23.5489, lng: -46.6388 },
-    validated: true
-  },
-  {
-    id: '10',
-    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    userName: 'Carlos Oliveira',
-    type: 2,
-    timestamp: new Date('2025-12-24T17:00:00'),
-    location: { lat: -23.5489, lng: -46.6388 },
-    validated: true
-  },
-  // 23/12 - Dia OK
-  {
-    id: '11',
-    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    userName: 'Carlos Oliveira',
-    type: 1,
-    timestamp: new Date('2025-12-23T08:10:00'),
-    location: { lat: -23.5489, lng: -46.6388 },
-    validated: true
-  },
-  {
-    id: '12',
-    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    userName: 'Carlos Oliveira',
-    type: 2,
-    timestamp: new Date('2025-12-23T17:05:00'),
-    location: { lat: -23.5489, lng: -46.6388 },
-    validated: true
-  },
-  // 22/12 - Problema não justificado
-  {
-    id: '13',
-    userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    userName: 'Carlos Oliveira',
-    type: 1,
-    timestamp: new Date('2025-12-22T09:45:00'),
-    location: { lat: -23.5489, lng: -46.6388 },
-    validated: false
-  }
-
+  { id: '3', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', userName: 'Carlos Oliveira', type: 1, timestamp: new Date('2025-12-27T08:05:00'), location: { lat: -23.5489, lng: -46.6388 }, validated: true },
+  { id: '4', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', userName: 'Carlos Oliveira', type: 2, timestamp: new Date('2025-12-27T12:00:00'), location: { lat: -23.5489, lng: -46.6388 }, validated: true },
+  { id: '5', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', userName: 'Carlos Oliveira', type: 1, timestamp: new Date('2025-12-27T13:00:00'), location: { lat: -23.5489, lng: -46.6388 }, validated: true },
+  { id: '6', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', userName: 'Carlos Oliveira', type: 2, timestamp: new Date('2025-12-27T17:00:00'), location: { lat: -23.5489, lng: -46.6388 }, validated: true },
+  // 26/12
+  { id: '7', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', userName: 'Carlos Oliveira', type: 1, timestamp: new Date('2025-12-26T10:30:00'), location: { lat: -23.5489, lng: -46.6388 }, validated: false },
+  { id: '8', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', userName: 'Carlos Oliveira', type: 2, timestamp: new Date('2025-12-26T15:00:00'), location: { lat: -23.5489, lng: -46.6388 }, validated: true },
+  // 24/12
+  { id: '9', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', userName: 'Carlos Oliveira', type: 1, timestamp: new Date('2025-12-24T08:00:00'), location: { lat: -23.5489, lng: -46.6388 }, validated: true },
+  { id: '10', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', userName: 'Carlos Oliveira', type: 2, timestamp: new Date('2025-12-24T17:00:00'), location: { lat: -23.5489, lng: -46.6388 }, validated: true },
+  // 23/12
+  { id: '11', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', userName: 'Carlos Oliveira', type: 1, timestamp: new Date('2025-12-23T08:10:00'), location: { lat: -23.5489, lng: -46.6388 }, validated: true },
+  { id: '12', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', userName: 'Carlos Oliveira', type: 2, timestamp: new Date('2025-12-23T17:05:00'), location: { lat: -23.5489, lng: -46.6388 }, validated: true },
+  // 22/12
+  { id: '13', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', userName: 'Carlos Oliveira', type: 1, timestamp: new Date('2025-12-22T09:45:00'), location: { lat: -23.5489, lng: -46.6388 }, validated: false },
 ];
 
 export const mockRequests: Request[] = [
@@ -176,7 +71,7 @@ export const mockWorkSchedules: WorkSchedule[] = [
   { id: '3', name: 'Escala 12x36', hoursPerDay: 12, toleranceMinutes: 15 },
 ];
 
-export const loginCredentials = {
+export const loginCredentials: Record<string, { password: string; userId: string }> = {
   'admin@geopoint.com': { password: 'admin123', userId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
   'rh@geopoint.com': { password: 'rh123', userId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' },
   'user@geopoint.com': { password: 'user123', userId: 'cccccccc-cccc-cccc-cccc-cccccccccccc' },

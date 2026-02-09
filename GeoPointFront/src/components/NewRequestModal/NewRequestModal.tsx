@@ -1,20 +1,24 @@
 import React, { useState } from 'react';
-import { X, FileText, Calendar, Clock, Upload } from 'lucide-react';
+import { FileText, Calendar, Clock, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { requestsApi, RequestType } from '@/services/api';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { requestsApi, attachmentsApi, RequestType, RequestStatus } from '@/services/api';
 import { toast } from 'sonner';
-import './NewRequestModal.css';
-
-export type { RequestType } from '@/services/api';
 
 export interface DisplayRequest {
   id: string;
-  type: string;
-  status: string;
+  type: RequestType;
+  status: RequestStatus;
   description: string;
   containsProof?: boolean;
   createdAt?: Date;
@@ -28,65 +32,81 @@ interface NewRequestModalProps {
 }
 
 const requestTypeLabels: Record<RequestType, string> = {
-  CERTIFICATE: 'Atestado Médico',
-  FORGOT_PUNCH: 'Esquecimento de Ponto',
-  VACATION: 'Férias',
+  1: 'Esquecimento de Ponto',
+  2: 'Atestado Médico',
+  3: 'Férias',
 };
 
 const requestTypeIcons: Record<RequestType, React.ReactNode> = {
-  CERTIFICATE: <FileText size={16} />,
-  FORGOT_PUNCH: <Clock size={16} />,
-  VACATION: <Calendar size={16} />,
+  1: <Clock size={16} />,
+  2: <FileText size={16} />,
+  3: <Calendar size={16} />,
 };
 
+const requestTypes: RequestType[] = [1, 2, 3];
+
 export default function NewRequestModal({ isOpen, onClose, onSubmit, userId }: NewRequestModalProps) {
-  const [type, setType] = useState<RequestType | ''>('');
+  const [type, setType] = useState<RequestType | null>(null);
   const [justification, setJustification] = useState('');
-  const [containsProof, setContainsProof] = useState(false);
   const [targetDate, setTargetDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+
+  const resetForm = () => {
+    setType(null);
+    setJustification('');
+    setTargetDate('');
+    setFile(null);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!type) {
+
+    if (type === null) {
       toast.error('Selecione o tipo de solicitação');
       return;
     }
-    
+
     if (!justification.trim()) {
       toast.error('Informe a justificativa');
       return;
     }
 
     setIsSubmitting(true);
-    
+
     try {
       const result = await requestsApi.create({
         requesterId: userId,
         type,
         targetDate: targetDate || undefined,
         justification: justification.trim(),
-        containsProof,
       });
+
+      if (file) {
+        try {
+          await attachmentsApi.upload(file, result.id);
+        } catch (uploadErr) {
+          console.error('Error uploading attachment:', uploadErr);
+          toast.error('Solicitação criada, mas erro ao anexar arquivo');
+        }
+      }
 
       const displayRequest: DisplayRequest = {
         id: result.id,
         type: result.type,
-        status: result.status,
+        status: 0 as RequestStatus, // Always PENDING on creation
         description: result.justificationUser,
-        containsProof: result.containsProof,
+        containsProof: !!file || result.containsProof,
         createdAt: result.createdAt ? new Date(result.createdAt) : new Date(),
       };
 
       onSubmit(displayRequest);
-      
-      // Reset form
-      setType('');
-      setJustification('');
-      setContainsProof(false);
-      setTargetDate('');
-      
+      resetForm();
       toast.success('Solicitação enviada com sucesso!');
       onClose();
     } catch (err) {
@@ -97,39 +117,30 @@ export default function NewRequestModal({ isOpen, onClose, onSubmit, userId }: N
     }
   };
 
-  const handleClose = () => {
-    setType('');
-    setJustification('');
-    setContainsProof(false);
-    setTargetDate('');
-    onClose();
-  };
-
-  if (!isOpen) return null;
-
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">Nova Solicitação</h2>
-          <button className="modal-close-btn" onClick={handleClose}>
-            <X size={20} />
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
+      <DialogContent className="sm:max-w-[480px]">
+        <DialogHeader>
+          <DialogTitle>Nova Solicitação</DialogTitle>
+          <DialogDescription>Preencha os dados abaixo para enviar sua solicitação.</DialogDescription>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="modal-form">
-          <div className="form-group">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="type">Tipo de Solicitação *</Label>
-            <Select value={type} onValueChange={(value) => setType(value as RequestType)}>
+            <Select
+              value={type !== null ? String(type) : ''}
+              onValueChange={(value) => setType(Number(value) as RequestType)}
+            >
               <SelectTrigger id="type">
                 <SelectValue placeholder="Selecione o tipo" />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(requestTypeLabels) as RequestType[]).map((key) => (
-                  <SelectItem key={key} value={key}>
-                    <div className="select-item-content">
-                      {requestTypeIcons[key]}
-                      <span>{requestTypeLabels[key]}</span>
+                {requestTypes.map((reqType) => (
+                  <SelectItem key={reqType} value={String(reqType)}>
+                    <div className="flex items-center gap-2">
+                      {requestTypeIcons[reqType]}
+                      <span>{requestTypeLabels[reqType]}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -137,18 +148,18 @@ export default function NewRequestModal({ isOpen, onClose, onSubmit, userId }: N
             </Select>
           </div>
 
-          <div className="form-group">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="targetDate">Data de Referência</Label>
             <input
               type="date"
               id="targetDate"
-              className="date-input"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={targetDate}
               onChange={(e) => setTargetDate(e.target.value)}
             />
           </div>
 
-          <div className="form-group">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="justification">Justificativa *</Label>
             <Textarea
               id="justification"
@@ -158,38 +169,45 @@ export default function NewRequestModal({ isOpen, onClose, onSubmit, userId }: N
               rows={4}
               maxLength={500}
             />
-            <span className="char-count">{justification.length}/500</span>
+            <span className="text-xs text-muted-foreground text-right">{justification.length}/500</span>
           </div>
 
-          <div className="form-group switch-group">
-            <div className="switch-content">
-              <div className="switch-icon">
-                <Upload size={18} />
-              </div>
-              <div className="switch-text">
-                <Label htmlFor="contains-proof">Contém comprovante</Label>
-                <span className="switch-description">
-                  Marque se você possui documentos para anexar
-                </span>
-              </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="attachment">Anexar comprovante</Label>
+            <div className="flex items-center gap-2 border border-dashed border-border rounded-md px-3 py-2 bg-muted/30 hover:border-primary transition-colors">
+              <label htmlFor="attachment" className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground flex-1">
+                <Paperclip size={18} />
+                <span>{file ? file.name : 'Clique para selecionar um arquivo'}</span>
+              </label>
+              <input
+                type="file"
+                id="attachment"
+                className="hidden"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+              />
+              {file && (
+                <button
+                  type="button"
+                  className="flex items-center justify-center w-5 h-5 rounded-full bg-destructive text-destructive-foreground"
+                  onClick={() => setFile(null)}
+                >
+                  <X size={12} />
+                </button>
+              )}
             </div>
-            <Switch
-              id="contains-proof"
-              checked={containsProof}
-              onCheckedChange={setContainsProof}
-            />
           </div>
 
-          <div className="modal-actions">
+          <DialogFooter className="pt-2">
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Enviando...' : 'Enviar Solicitação'}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

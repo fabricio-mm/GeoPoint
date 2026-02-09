@@ -1,4 +1,5 @@
 export type UserRole = 'admin' | 'rh_analyst' | 'employee';
+
 export type ViewMode = 'admin' | 'rh' | 'employee';
 
 export interface User {
@@ -15,11 +16,14 @@ export interface User {
   };
 }
 
+// Numeric types matching the API: 1=ENTRY, 2=EXIT
+export type TimeRecordType = 1 | 2;
+
 export interface TimeRecord {
   id: string;
   userId: string;
   userName: string;
-  type: number;
+  type: TimeRecordType;
   timestamp: Date;
   location: {
     lat: number;

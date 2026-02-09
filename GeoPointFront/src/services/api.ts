@@ -1,16 +1,33 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://localhost:7145';
 
-// Types
+// ==================== TYPES ====================
+
 export type UserRole = 'EMPLOYEE' | 'HR' | 'ADMIN';
+export type UserStatus = 'ACTIVE' | 'INACTIVE';
 export type LocationType = 'OFFICE' | 'HOME';
 export type TimeEntryType = 1 | 2;
-export type TimeEntryOrigin = 'WEB' | 'MOBILE';
-export type RequestType = 'CERTIFICATE' | 'FORGOT_PUNCH' | 'VACATION';
-export type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type TimeEntryOrigin = 1 | 2; // 1=WEB, 2=MOBILE
+export type RequestType = 1 | 2 | 3; // 1=FORGOT_PUNCH, 2=CERTIFICATE, 3=VACATION
+export type RequestStatus = 0 | 1 | 2; // 0=PENDING, 1=APPROVED, 2=REJECTED
 
-export type UserStatus = 'ACTIVE' | 'INACTIVE';
+// ==================== INTERFACES ====================
 
-// Interfaces
+export interface WorkSchedule {
+  id: string;
+  name: string;
+  dailyHoursTarget: string;
+  toleranceMinutes: number;
+  workDays: number[];
+  users?: User[];
+}
+
+export interface WorkScheduleCreate {
+  name: string;
+  dailyHoursTarget: string;
+  toleranceMinutes: number;
+  workDays: number[];
+}
+
 export interface User {
   id: string;
   fullName: string;
@@ -18,21 +35,8 @@ export interface User {
   role: UserRole;
   status: UserStatus;
   workScheduleId?: string;
-}
-
-export interface WorkSchedule {
-  id: string;
-  name: string;
-  dailyHoursTarget: number;
-  toleranceMinutes: number;
-  workDays: number[];
-}
-
-export interface WorkScheduleCreate {
-  name: string;
-  dailyHoursTarget: number;
-  toleranceMinutes: number;
-  workDays: number[];
+  workSchedule?: WorkSchedule;
+  locations?: Location[];
 }
 
 export interface Location {
@@ -58,12 +62,13 @@ export interface LocationCreate {
 export interface TimeEntry {
   id: string;
   userId: string;
+  timestampUtc: string;
   type: TimeEntryType;
   origin: TimeEntryOrigin;
   latitudeRecorded: number;
   longitudeRecorded: number;
-  createdAt?: string;
-  timestampUtc: string;
+  isManualAdjustment?: boolean;
+  user?: User;
 }
 
 export interface TimeEntryCreate {
@@ -77,14 +82,16 @@ export interface TimeEntryCreate {
 export interface Request {
   id: string;
   requesterId: string;
+  reviewerId?: string;
   type: RequestType;
+  targetDate?: string;
   status: RequestStatus;
   justificationUser: string;
   containsProof: boolean;
-  targetDate?: string;
   createdAt?: string;
   requester?: User;
-  reviewerId?: string;
+  reviewer?: User;
+  attachments?: Attachment[];
 }
 
 export interface RequestCreate {
@@ -97,21 +104,25 @@ export interface RequestCreate {
 
 export interface RequestReview {
   reviewerId: string;
-  newStatus: 'APPROVED' | 'REJECTED';
+  newStatus: 1 | 2; // 1=APPROVED, 2=REJECTED
 }
 
 export interface Attachment {
   id: string;
   requestId: string;
-  fileUrl: string;
-  fileType: string;
+  fileUrl?: string;
+  fileType?: string;
 }
 
 export interface DailyBalance {
   id: string;
   userId: string;
   referenceDate: string;
+  totalWorkedMinutes?: number;
   balanceMinutes: number;
+  overtimeMinutes?: number;
+  status?: string;
+  user?: User;
 }
 
 export interface AuditLog {
@@ -127,13 +138,14 @@ export interface AuditLogFilters {
   entity?: string;
 }
 
-// API Helper
+// ==================== API Helper ====================
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   const config: RequestInit = {
     ...options,
     headers: {
@@ -149,10 +161,9 @@ async function apiRequest<T>(
     throw new Error(errorText || `HTTP error! status: ${response.status}`);
   }
 
-  // Handle empty responses
   const text = await response.text();
   if (!text) return {} as T;
-  
+
   return JSON.parse(text);
 }
 
@@ -233,6 +244,14 @@ export const requestsApi = {
   getPending: (): Promise<Request[]> => {
     return apiRequest<Request[]>('/api/Requests/pending');
   },
+
+  getById: (id: string): Promise<Request> => {
+    return apiRequest<Request>(`/api/Requests/${id}`);
+  },
+
+  getByUser: (userId: string): Promise<Request[]> => {
+    return apiRequest<Request[]>(`/api/Requests/user/${userId}`);
+  },
 };
 
 // ==================== ATTACHMENTS ====================
@@ -240,8 +259,8 @@ export const requestsApi = {
 export const attachmentsApi = {
   upload: async (file: File, requestId: string): Promise<Attachment> => {
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('requestId', requestId);
+    formData.append('File', file);
+    formData.append('RequestId', requestId);
 
     const response = await fetch(`${API_BASE_URL}/api/Attachments`, {
       method: 'POST',
@@ -267,6 +286,10 @@ export const reportsApi = {
   getBalance: (userId: string): Promise<DailyBalance[]> => {
     return apiRequest<DailyBalance[]>(`/api/Reports/balance/${userId}`);
   },
+
+  getAuditLogs: (): Promise<AuditLog[]> => {
+    return apiRequest<AuditLog[]>('/api/Reports/audit-logs');
+  },
 };
 
 // ==================== AUDIT LOGS ====================
@@ -276,12 +299,25 @@ export const auditLogsApi = {
     const params = new URLSearchParams();
     if (filters?.userId) params.append('userId', filters.userId);
     if (filters?.entity) params.append('entity', filters.entity);
-    
+
     const queryString = params.toString();
     const endpoint = queryString ? `/api/AuditLogs?${queryString}` : '/api/AuditLogs';
-    
+
     return apiRequest<AuditLog[]>(endpoint);
   },
+};
+
+// ==================== HELPER FUNCTIONS ====================
+
+// Parse dailyHoursTarget from "HH:MM:SS" to hours number
+export const parseHoursTarget = (target: string): number => {
+  const parts = target.split(':');
+  if (parts.length >= 2) {
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    return hours + (minutes / 60);
+  }
+  return 8;
 };
 
 // Export all APIs as a single object for convenience

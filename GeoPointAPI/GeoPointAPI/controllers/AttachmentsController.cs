@@ -3,9 +3,11 @@ using GeoPointAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using GeoPointAPI.DTOs;
+using Microsoft.AspNetCore.Authorization;
 
 namespace GeoPointAPI.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class AttachmentsController : ControllerBase

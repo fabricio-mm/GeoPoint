@@ -4,8 +4,10 @@ using GeoPointAPI.Models;
 using GeoPointAPI.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace GeoPointAPI.controllers;
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class TimeEntriesController : ControllerBase

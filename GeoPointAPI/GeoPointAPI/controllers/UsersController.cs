@@ -2,11 +2,13 @@
 using GeoPointAPI.DTOs;
 using GeoPointAPI.Models;
 using GeoPointAPI.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace GeoPointAPI.controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class UsersController : ControllerBase

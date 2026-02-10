@@ -31,6 +31,10 @@ public class User
 
     [Column("work_schedule_id")]
     public Guid WorkScheduleId { get; set; }
+
+    [Column("password")]
+    [Required]
+    public string Password { get; set; } = "123456";
     
     [ForeignKey("WorkScheduleId")]
     public virtual WorkSchedules? WorkSchedule { get; set; }

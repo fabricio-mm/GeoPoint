@@ -3,9 +3,11 @@ using GeoPointAPI.Models;
 using GeoPointAPI.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace GeoPointAPI.controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class WorkSchedulesController : ControllerBase

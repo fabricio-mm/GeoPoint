@@ -4,9 +4,10 @@ using GeoPointAPI.Models;
 using GeoPointAPI.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace GeoPointAPI.Controllers;
-
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class RequestsController : ControllerBase

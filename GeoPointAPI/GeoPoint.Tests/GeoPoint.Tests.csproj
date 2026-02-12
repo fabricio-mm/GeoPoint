@@ -27,8 +27,4 @@
     <ProjectReference Include="..\GeoPointAPI\GeoPointAPI.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="integration\" />
-  </ItemGroup>
-
 </Project>

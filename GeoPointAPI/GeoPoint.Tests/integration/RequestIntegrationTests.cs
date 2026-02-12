@@ -186,7 +186,7 @@ public class RequestsIntegrationTests : IClassFixture<GeoPointFactory>
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Database.EnsureCreated();
 
-            // Criar o Funcionário e a Gestora
+            // Criar Usuários (Importante: O Controller verifica se o Reviewer existe!)
             var fabricio = new Models.User { Id = idFabricio, FullName = "Fabricio", Email = "faifas@geo.com", Role = UserRole.Employee, Password = "123" };
             var giovanna = new Models.User { Id = idGiovanna, FullName = "Giovanna", Email = "gio@geo.com", Role = UserRole.Admin, Password = "123" };
             db.Users.AddRange(fabricio, giovanna);
@@ -203,17 +203,23 @@ public class RequestsIntegrationTests : IClassFixture<GeoPointFactory>
             await db.SaveChangesAsync();
         }
 
-        // DTO de Avaliação (Ajuste os nomes conforme sua ReviewRequestDto)
+        // DTO CORRIGIDO: Usando 'NewStatus' igual ao seu ReviewRequestDto
         var reviewDto = new
         {
             ReviewerId = idGiovanna,
-            Status = RequestStatus.Accepted,
-            JustificationReview = "Tudo certo, Faifas! Aprovado."
+            NewStatus = RequestStatus.Accepted // <--- O NOME CERTO É NewStatus
         };
 
         // 2. ACT
-        // Ajuste a URL se o seu endpoint for diferente (ex: /api/Requests/{id}/review)
+        // A rota é api/Requests/{id}/review
         var response = await _client.PutAsJsonAsync($"/api/Requests/{requestId}/review", reviewDto);
+
+        // Debug de erro
+        if (!response.IsSuccessStatusCode)
+        {
+             var erro = await response.Content.ReadAsStringAsync();
+             throw new Exception($"Erro no PUT: {response.StatusCode} - {erro}");
+        }
 
         // 3. ASSERT
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -224,8 +230,58 @@ public class RequestsIntegrationTests : IClassFixture<GeoPointFactory>
             var salvo = db.Requests.Find(requestId);
 
             salvo.Should().NotBeNull();
-            salvo!.Status.Should().Be(RequestStatus.Accepted); // Validou a mudança de estado
-            salvo.ReviewerId.Should().Be(idGiovanna); // Validou quem aprovou
+            // Agora sim ele vai achar Approved (ou o status que você usou no enum)
+            salvo!.Status.Should().Be(RequestStatus.Accepted);
+            salvo.ReviewerId.Should().Be(idGiovanna);
+        }
+    }
+
+    [Fact]
+    public async Task Delete_DeveRemoverRequest_QuandoExiste()
+    {
+        // 1. ARRANGE
+        var requestId = Guid.NewGuid();
+        var requesterId = Guid.NewGuid();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Database.EnsureCreated();
+
+            // Criar Usuário e Request
+            var user = new Models.User { Id = requesterId, FullName = "Fabricio Del", Email = "del@geo.com", Role = UserRole.Employee, Password = "123" };
+            db.Users.Add(user);
+
+            db.Requests.Add(new Models.Request
+            {
+                Id = requestId,
+                RequesterId = requesterId,
+                Type = RequestType.ForgotPunch,
+                Status = RequestStatus.Pending,
+                TargetDate = DateTime.Now
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // 2. ACT
+        var response = await _client.DeleteAsync($"/api/Requests/{requestId}");
+
+        // Debug se der erro
+        if (!response.IsSuccessStatusCode)
+        {
+            var erro = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Erro no DELETE: {response.StatusCode} - {erro}");
+        }
+
+        // 3. ASSERT
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent); // Espera 204
+
+        // Prova real: Tenta buscar no banco e tem que ser NULO
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var apagado = await db.Requests.FindAsync(requestId);
+            apagado.Should().BeNull();
         }
     }
 }

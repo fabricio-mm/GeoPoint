@@ -108,6 +108,26 @@ public class RequestsController : ControllerBase
         return Ok(pending);
     }
 
+    // Cancelar Solicitação (DELETE)
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var request = await _context.Requests.FindAsync(id);
+
+        if (request == null)
+        {
+            return NotFound("Solicitação não encontrada.");
+        }
+
+        // Regra de Ouro: Só pode deletar se estiver Pendente? (Opcional, mas recomendado)
+        // if (request.Status != RequestStatus.Pending) return BadRequest("Não pode cancelar solicitação já avaliada.");
+
+        _context.Requests.Remove(request);
+        await _context.SaveChangesAsync();
+
+        return NoContent(); // Retorna 204 (Sucesso sem conteúdo)
+    }
+
 
 
 }

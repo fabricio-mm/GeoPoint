@@ -62,3 +62,5 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 *.env
+
+google-drive-key.json

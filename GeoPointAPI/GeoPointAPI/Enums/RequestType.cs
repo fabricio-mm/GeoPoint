@@ -2,7 +2,8 @@
 
 public enum RequestType
 {
-    Certificate = 1, // Atestado médico
-    ForgotPunch = 2,  // Esqueceu de bater o ponto
-    Vacations = 3
+    MaternityLeave = 0,
+    DoctorsNote = 1,
+    ForgotPunch = 2,
+    Vacations = 3,
 }

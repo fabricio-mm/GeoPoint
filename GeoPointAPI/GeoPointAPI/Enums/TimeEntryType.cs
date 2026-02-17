@@ -2,6 +2,8 @@
 
 public enum TimeEntryType
 {
-    Entry = 1,
-    Exit = 2,
+    Entry = 0,
+    LaunchTime = 1,
+    ReturnToWork = 2,
+    Exit = 3
 }

@@ -2,7 +2,8 @@
 
 public enum UserRole
 {
+    Intern = 0,
     Employee = 1,
-    Hr = 2, //HumanResources
-    Admin = 3
+    Trainee = 2,
+    Contractor = 3
 }

@@ -18,5 +18,11 @@ public class CreateUserDto
     public UserRole Role { get; set; }
 
     [Required]
-    public Guid WorkScheduleId { get; set; }
+    public WorkScheduleType WorkScheduleId { get; set; } // O Front manda 0, 1 ou 2
+
+    [Required]
+    public Department Department { get; set; }
+
+    [Required]
+    public JobTitle JobTitle { get; set; }
 }

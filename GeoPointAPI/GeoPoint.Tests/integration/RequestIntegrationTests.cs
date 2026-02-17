@@ -49,7 +49,7 @@ public class RequestsIntegrationTests : IClassFixture<GeoPointFactory>
             {
                 Id = idTeste,
                 RequesterId = requesterId, // Ligando ao usuário que acabamos de criar
-                Type = RequestType.Certificate,
+                Type = RequestType.DoctorsNote,
                 Status = RequestStatus.Pending,
                 TargetDate = DateTime.Now
             });
@@ -91,15 +91,15 @@ public class RequestsIntegrationTests : IClassFixture<GeoPointFactory>
             db.Users.AddRange(new List<Models.User>
             {
                 new Models.User { Id = idFabricio, FullName = "Fabricio", Email = "faifas@geo.com", Role = UserRole.Employee, Password = "123" },
-                new Models.User { Id = idGiovanna, FullName = "Giovanna", Email = "gio@geo.com", Role = UserRole.Admin, Password = "123" }
+                new Models.User { Id = idGiovanna, FullName = "Giovanna", Email = "gio@geo.com", Role = UserRole.Contractor, Password = "123" }
             });
 
             // Criar solicitações misturadas
             db.Requests.AddRange(new List<Models.Request>
             {
                 // Duas do Fabricio
-                new Models.Request { RequesterId = idFabricio, Type = RequestType.Certificate, Status = RequestStatus.Pending, TargetDate = DateTime.Now },
-                new Models.Request { RequesterId = idFabricio, Type = RequestType.Certificate, Status = RequestStatus.Accepted, TargetDate = DateTime.Now.AddDays(-1) },
+                new Models.Request { RequesterId = idFabricio, Type = RequestType.DoctorsNote, Status = RequestStatus.Pending, TargetDate = DateTime.Now },
+                new Models.Request { RequesterId = idFabricio, Type = RequestType.DoctorsNote, Status = RequestStatus.Accepted, TargetDate = DateTime.Now.AddDays(-1) },
 
                 // Uma da Giovanna (NÃO deve aparecer)
                 new Models.Request { RequesterId = idGiovanna, Type = RequestType.ForgotPunch, Status = RequestStatus.Pending, TargetDate = DateTime.Now }
@@ -188,7 +188,7 @@ public class RequestsIntegrationTests : IClassFixture<GeoPointFactory>
 
             // Criar Usuários (Importante: O Controller verifica se o Reviewer existe!)
             var fabricio = new Models.User { Id = idFabricio, FullName = "Fabricio", Email = "faifas@geo.com", Role = UserRole.Employee, Password = "123" };
-            var giovanna = new Models.User { Id = idGiovanna, FullName = "Giovanna", Email = "gio@geo.com", Role = UserRole.Admin, Password = "123" };
+            var giovanna = new Models.User { Id = idGiovanna, FullName = "Giovanna", Email = "gio@geo.com", Role = UserRole.Contractor, Password = "123" };
             db.Users.AddRange(fabricio, giovanna);
 
             // Criar a solicitação Pendente

@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using GeoPointAPI.Models;
 using Microsoft.IdentityModel.Tokens;
+
 namespace GeoPointAPI.Services;
 
 public class TokenService
@@ -21,8 +22,18 @@ public class TokenService
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Name, user.FullName),
             new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Role, user.Role.ToString())
+
+            // Tipo de Contrato (Employee, Contractor, Intern)
+            new Claim(ClaimTypes.Role, user.Role.ToString()),
+
+            // 👇 NOVAS REGRAS DE NEGÓCIO
+            // JobTitle: Define a permissão real (Manager aprova, Developer não)
+            new Claim("JobTitle", user.JobTitle.ToString()),
+
+            // Department: Útil para filtrar solicitações (Gerente de TI só vê TI)
+            new Claim("Department", user.Department.ToString())
         };
+
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
@@ -31,9 +42,10 @@ public class TokenService
             issuer: _configuration["Jwt:Issuer"],
             audience: _configuration["Jwt:Audience"],
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(8),
+            expires: DateTime.UtcNow.AddHours(8), // Token dura o dia de trabalho
             signingCredentials: creds
         );
+
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }

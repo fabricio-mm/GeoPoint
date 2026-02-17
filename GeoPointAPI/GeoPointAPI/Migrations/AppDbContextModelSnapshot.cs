@@ -183,6 +183,10 @@ namespace GeoPointAPI.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("JustificationReviewer")
+                        .HasColumnType("text")
+                        .HasColumnName("justification_reviewer");
+
                     b.Property<string>("JustificationUser")
                         .HasColumnType("text")
                         .HasColumnName("justification_user");
@@ -269,6 +273,11 @@ namespace GeoPointAPI.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Department")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("department");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -280,6 +289,11 @@ namespace GeoPointAPI.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("full_name");
+
+                    b.Property<string>("JobTitle")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("jobtitle");
 
                     b.Property<string>("Password")
                         .IsRequired()
@@ -296,8 +310,9 @@ namespace GeoPointAPI.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
-                    b.Property<Guid>("WorkScheduleId")
-                        .HasColumnType("uuid")
+                    b.Property<string>("WorkScheduleId")
+                        .IsRequired()
+                        .HasColumnType("text")
                         .HasColumnName("work_schedule_id");
 
                     b.HasKey("Id");
@@ -307,22 +322,25 @@ namespace GeoPointAPI.Migrations
                     b.ToTable("USERS");
                 });
 
-            modelBuilder.Entity("GeoPointAPI.Models.WorkSchedules", b =>
+            modelBuilder.Entity("GeoPointAPI.Models.WorkSchedule", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
                         .HasColumnName("id");
 
-                    b.Property<TimeSpan>("DailyHoursTarget")
+                    b.Property<TimeSpan>("EndTime")
                         .HasColumnType("interval")
-                        .HasColumnName("daily_hours_target");
+                        .HasColumnName("end_time");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
+
+                    b.Property<TimeSpan>("StartTime")
+                        .HasColumnType("interval")
+                        .HasColumnName("start_time");
 
                     b.Property<int>("ToleranceMinutes")
                         .HasColumnType("integer")
@@ -336,6 +354,35 @@ namespace GeoPointAPI.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("WORK_SCHEDULES");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "Comercial",
+                            EndTime = new TimeSpan(0, 18, 0, 0, 0),
+                            Name = "Comercial (08h-18h)",
+                            StartTime = new TimeSpan(0, 8, 0, 0, 0),
+                            ToleranceMinutes = 10,
+                            WorkDays = new[] { 1, 2, 3, 4, 5 }
+                        },
+                        new
+                        {
+                            Id = "Intern",
+                            EndTime = new TimeSpan(0, 15, 0, 0, 0),
+                            Name = "Intern (08h-15h)",
+                            StartTime = new TimeSpan(0, 8, 0, 0, 0),
+                            ToleranceMinutes = 15,
+                            WorkDays = new[] { 1, 2, 3, 4, 5 }
+                        },
+                        new
+                        {
+                            Id = "Contractor",
+                            EndTime = new TimeSpan(0, 18, 0, 0, 0),
+                            Name = "Contractor (09h-18h)",
+                            StartTime = new TimeSpan(0, 9, 0, 0, 0),
+                            ToleranceMinutes = 5,
+                            WorkDays = new[] { 1, 2, 3, 4, 5 }
+                        });
                 });
 
             modelBuilder.Entity("GeoPointAPI.Models.Attachment", b =>
@@ -411,7 +458,7 @@ namespace GeoPointAPI.Migrations
 
             modelBuilder.Entity("GeoPointAPI.Models.User", b =>
                 {
-                    b.HasOne("GeoPointAPI.Models.WorkSchedules", "WorkSchedule")
+                    b.HasOne("GeoPointAPI.Models.WorkSchedule", "WorkSchedule")
                         .WithMany("Users")
                         .HasForeignKey("WorkScheduleId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -430,7 +477,7 @@ namespace GeoPointAPI.Migrations
                     b.Navigation("Locations");
                 });
 
-            modelBuilder.Entity("GeoPointAPI.Models.WorkSchedules", b =>
+            modelBuilder.Entity("GeoPointAPI.Models.WorkSchedule", b =>
                 {
                     b.Navigation("Users");
                 });

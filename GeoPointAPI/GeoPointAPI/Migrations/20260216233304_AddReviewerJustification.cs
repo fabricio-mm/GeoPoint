@@ -5,25 +5,24 @@
 namespace GeoPointAPI.Migrations
 {
     /// <inheritdoc />
-    public partial class AddPasswordToUser : Migration
+    public partial class AddReviewerJustification : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "Password",
-                table: "USERS",
+                name: "justification_reviewer",
+                table: "REQUESTS",
                 type: "text",
-                nullable: false,
-                defaultValue: "");
+                nullable: true);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "Password",
-                table: "USERS");
+                name: "justification_reviewer",
+                table: "REQUESTS");
         }
     }
 }

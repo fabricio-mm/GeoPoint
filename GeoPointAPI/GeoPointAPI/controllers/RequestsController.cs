@@ -20,10 +20,19 @@ public class RequestsController : ControllerBase
         _context = context;
     }
 
-    // Criar Solicitação
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateRequestDto dto)
     {
+        // 🛡️ REGRA 1: ANTECEDÊNCIA DE 30 DIAS PARA FÉRIAS
+        if (dto.Type == RequestType.Vacations)
+        {
+            var dataMinima = DateTime.UtcNow.AddDays(30);
+            if (dto.TargetDate < dataMinima)
+            {
+                return BadRequest(new { message = "Solicitações de férias devem ser feitas com no mínimo 30 dias de antecedência." });
+            }
+        }
+
         var request = new Request
         {
             Id = Guid.NewGuid(),
@@ -31,7 +40,7 @@ public class RequestsController : ControllerBase
             Type = dto.Type,
             TargetDate = dto.TargetDate,
             JustificationUser = dto.Justification,
-            Status = RequestStatus.Pending, // Nasce pendente
+            Status = RequestStatus.Pending,
             ReviewerId = null
         };
 
@@ -41,50 +50,57 @@ public class RequestsController : ControllerBase
         return CreatedAtAction(nameof(GetRequestById), new { id = request.Id }, request);
     }
 
-    // Aprovar ou Rejeitar (Review)
     [HttpPut("{id}/review")]
     public async Task<IActionResult> Review(Guid id, [FromBody] ReviewRequestDto dto)
     {
-        var request = await _context.Requests.FindAsync(id);
+        // Carregamos a request incluindo o Requester para checar o Departamento
+        var request = await _context.Requests
+            .Include(r => r.Requester)
+            .FirstOrDefaultAsync(r => r.Id == id);
+
         if (request == null) return NotFound(new { message = "Solicitação não encontrada." });
 
-        // 1. Validar se o Avaliador existe
         var reviewer = await _context.Users.FindAsync(dto.ReviewerId);
         if (reviewer == null) return BadRequest(new { message = "Avaliador inválido." });
 
-        // 2. Validações de Segurança (Role e Conflito de Interesse)
-        if (reviewer.Role == UserRole.Employee)
+        // 🛡️ REGRA 2: PERMISSÃO POR CARGO (Manager ou HR)
+        var cargosComPermissao = new List<JobTitle> { JobTitle.Manager, JobTitle.HrAnalyst };
+        if (!cargosComPermissao.Contains(reviewer.JobTitle))
         {
-            return StatusCode(403, new { message = "Acesso negado: Funcionários não podem avaliar solicitações." });
+            return StatusCode(403, new { message = "Acesso negado: Seu cargo não permite avaliar solicitações." });
         }
+
+        // 🛡️ REGRA 3: TRAVA DE DEPARTAMENTO (Apenas para Gerentes)
+        if (reviewer.JobTitle == JobTitle.Manager && reviewer.Department != request.Requester?.Department)
+        {
+            return StatusCode(403, new { message = "Acesso negado: Você só pode avaliar solicitações do seu próprio departamento." });
+        }
+
+        // 🛡️ REGRA 4: CONFLITO DE INTERESSE
         if (request.RequesterId == dto.ReviewerId)
         {
             return BadRequest(new { message = "Conflito de interesse: Você não pode avaliar sua própria solicitação." });
         }
 
-        // =================================================================================
-        // 🚀 AUTOMAÇÃO DE FÉRIAS (AQUI ESTÁ A MÁGICA)
-        // =================================================================================
+        // 🛡️ REGRA 5: JUSTIFICATIVA OBRIGATÓRIA NA REPROVAÇÃO
+        if (dto.NewStatus == RequestStatus.Rejected && string.IsNullOrWhiteSpace(dto.Comment))
+        {
+            return BadRequest(new { message = "É obrigatório informar o motivo ao rejeitar uma solicitação." });
+        }
 
-        // Se foi APROVADO e é pedido de FÉRIAS
+        // AUTOMATIZAÇÃO DE FÉRIAS
         if (dto.NewStatus == RequestStatus.Accepted && request.Type == RequestType.Vacations)
         {
-            // Busca o funcionário que pediu as férias
             var funcionario = await _context.Users.FindAsync(request.RequesterId);
-
-            if (funcionario != null)
-            {
-                // Muda o status dele para "Em Férias"
-                funcionario.Status = UserStatus.OnVacation;
-
-                // O Entity Framework é esperto: como alteramos o 'funcionario' e a 'request',
-                // o SaveChangesAsync lá embaixo vai salvar as duas alterações numa tacada só (Transação).
-            }
+            if (funcionario != null) funcionario.Status = UserStatus.OnVacation;
         }
 
         // Atualiza a solicitação
         request.Status = dto.NewStatus;
         request.ReviewerId = dto.ReviewerId;
+
+        // ✅ AGORA SALVANDO O COMENTÁRIO DO REVISOR
+        request.JustificationReviewer = dto.Comment;
 
         _context.Requests.Update(request);
         await _context.SaveChangesAsync();
@@ -92,14 +108,12 @@ public class RequestsController : ControllerBase
         return Ok(new { message = $"Solicitação atualizada para {dto.NewStatus}" });
     }
 
-    // GET: api/Requests/{id}
     [HttpGet("{id}")]
     public async Task<ActionResult<Models.Request>> GetRequestById(Guid id)
     {
         var request = await _context.Requests
             .Include(r => r.Requester)
             .Include(r => r.Reviewer)
-            //.Include(r => r.Attachments) // Descomente se tiver anexos implementado
             .FirstOrDefaultAsync(r => r.Id == id);
 
         if (request == null) return NotFound(new { message = "Solicitação não encontrada." });
@@ -107,12 +121,10 @@ public class RequestsController : ControllerBase
         return Ok(request);
     }
 
-    // GET: api/Requests/user/{userId}
     [HttpGet("user/{userId}")]
     public async Task<ActionResult<IEnumerable<Models.Request>>> GetRequestsByUserId(Guid userId)
     {
         var userExists = await _context.Users.AnyAsync(u => u.Id == userId);
-
         if (!userExists) return NotFound(new { message = "Usuário não encontrado." });
 
         var requests = await _context.Requests
@@ -123,32 +135,24 @@ public class RequestsController : ControllerBase
         return Ok(requests);
     }
 
-    // GET: api/Requests/pending (Para o Painel do Gestor)
     [HttpGet("pending")]
     public async Task<IActionResult> GetPending()
     {
         var pending = await _context.Requests
             .Where(r => r.Status == RequestStatus.Pending)
-            .Include(r => r.Requester) // Importante para saber QUEM pediu
+            .Include(r => r.Requester)
             .OrderBy(r => r.TargetDate)
             .ToListAsync();
 
         return Ok(pending);
     }
 
-    // Cancelar Solicitação (DELETE)
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var request = await _context.Requests.FindAsync(id);
+        if (request == null) return NotFound(new { message = "Solicitação não encontrada." });
 
-        if (request == null)
-        {
-            return NotFound(new { message = "Solicitação não encontrada." });
-        }
-
-        // 🔒 REGRA DE INTEGRIDADE: Só pode apagar se ainda estiver Pendente.
-        // Se já foi aprovado/rejeitado, virou documento histórico e não pode sumir.
         if (request.Status != RequestStatus.Pending)
         {
             return BadRequest(new { message = "Não é possível cancelar uma solicitação que já foi avaliada." });

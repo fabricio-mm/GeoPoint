@@ -3,10 +3,12 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
+#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
+
 namespace GeoPointAPI.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class BancoLegivel : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -15,9 +17,10 @@ namespace GeoPointAPI.Migrations
                 name: "WORK_SCHEDULES",
                 columns: table => new
                 {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    id = table.Column<string>(type: "text", nullable: false),
                     name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    daily_hours_target = table.Column<TimeSpan>(type: "interval", nullable: false),
+                    start_time = table.Column<TimeSpan>(type: "interval", nullable: false),
+                    end_time = table.Column<TimeSpan>(type: "interval", nullable: false),
                     tolerance_minutes = table.Column<int>(type: "integer", nullable: false),
                     work_days = table.Column<int[]>(type: "integer[]", nullable: false)
                 },
@@ -34,8 +37,11 @@ namespace GeoPointAPI.Migrations
                     full_name = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     email = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     role = table.Column<string>(type: "text", nullable: false),
+                    department = table.Column<string>(type: "text", nullable: false),
+                    jobtitle = table.Column<string>(type: "text", nullable: false),
                     status = table.Column<string>(type: "text", nullable: false),
-                    work_schedule_id = table.Column<Guid>(type: "uuid", nullable: false)
+                    work_schedule_id = table.Column<string>(type: "text", nullable: false),
+                    password = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -187,6 +193,16 @@ namespace GeoPointAPI.Migrations
                         principalTable: "REQUESTS",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.InsertData(
+                table: "WORK_SCHEDULES",
+                columns: new[] { "id", "end_time", "name", "start_time", "tolerance_minutes", "work_days" },
+                values: new object[,]
+                {
+                    { "Comercial", new TimeSpan(0, 18, 0, 0, 0), "Comercial (08h-18h)", new TimeSpan(0, 8, 0, 0, 0), 10, new[] { 1, 2, 3, 4, 5 } },
+                    { "Contractor", new TimeSpan(0, 18, 0, 0, 0), "Contractor (09h-18h)", new TimeSpan(0, 9, 0, 0, 0), 5, new[] { 1, 2, 3, 4, 5 } },
+                    { "Intern", new TimeSpan(0, 15, 0, 0, 0), "Intern (08h-15h)", new TimeSpan(0, 8, 0, 0, 0), 15, new[] { 1, 2, 3, 4, 5 } }
                 });
 
             migrationBuilder.CreateIndex(

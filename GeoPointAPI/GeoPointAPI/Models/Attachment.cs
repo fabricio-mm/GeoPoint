@@ -31,4 +31,6 @@ public class Attachment
 
     [ForeignKey("RequestId")]
     public virtual Request? Request { get; set; }
+
+    public bool IsDeleted { get; set; } = false;
 }

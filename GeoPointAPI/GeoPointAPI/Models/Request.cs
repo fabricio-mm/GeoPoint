@@ -35,6 +35,10 @@ public class Request
     [Column("justification_reviewer")]
     public string? JustificationReviewer { get; set; }
 
+    public bool IsDeleted { get; set; } = false;
+
+    public DateTime? DeletedAt { get; set; }
+
     // --- PROPRIEDADES DE NAVEGAÇÃO ---
 
     [ForeignKey("RequesterId")]

@@ -35,6 +35,10 @@ public class AppDbContext : DbContext
             .Property(u => u.Status)
             .HasConversion<string>();
 
+        modelBuilder.Entity<Request>().HasQueryFilter(r => !r.IsDeleted);
+        modelBuilder.Entity<Attachment>().HasQueryFilter(a => !a.IsDeleted);
+            base.OnModelCreating(modelBuilder);
+
         // 👇 NOVOS: Para salvar "Manager" e "IT"
         modelBuilder.Entity<User>()
             .Property(u => u.JobTitle)

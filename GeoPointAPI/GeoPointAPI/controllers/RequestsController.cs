@@ -2,6 +2,7 @@
 using GeoPointAPI.DTOs;
 using GeoPointAPI.Models;
 using GeoPointAPI.Enums;
+using GeoPointAPI.Services; // 👈 Certifique-se de ter este namespace
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
@@ -14,16 +15,33 @@ namespace GeoPointAPI.Controllers;
 public class RequestsController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly GoogleDriveService _driveService; // 1. Serviço Injetado
 
-    public RequestsController(AppDbContext context)
+    // 2. Adicionado ao Construtor
+    public RequestsController(AppDbContext context, GoogleDriveService driveService)
     {
         _context = context;
+        _driveService = driveService;
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateRequestDto dto)
+    // [FromForm] permite receber arquivos e dados JSON simultaneamente
+    public async Task<IActionResult> Create([FromForm] CreateRequestDto dto)
     {
-        // 🛡️ REGRA 1: ANTECEDÊNCIA DE 30 DIAS PARA FÉRIAS
+        // 🛡️ REGRA: Trava de Solicitações Pendentes (Máximo 3)
+        var pendingCount = await _context.Requests
+            .CountAsync(r => r.RequesterId == dto.RequesterId && r.Status == RequestStatus.Pending);
+
+        if (pendingCount >= 3)
+            return BadRequest(new { message = "Você já possui 3 solicitações pendentes. Aguarde a avaliação do gestor." });
+
+        // 🛡️ REGRA: Anexo Obrigatório para Atestado (DoctorsNote)
+        if (dto.Type == RequestType.DoctorsNote && (dto.Attachments == null || !dto.Attachments.Any()))
+        {
+            return BadRequest(new { message = "Para solicitações de atestado médico, o envio do comprovante em anexo é obrigatório." });
+        }
+
+        // 🛡️ REGRA: Antecedência de 30 dias para Férias
         if (dto.Type == RequestType.Vacations)
         {
             var dataMinima = DateTime.UtcNow.AddDays(30);
@@ -44,6 +62,31 @@ public class RequestsController : ControllerBase
             ReviewerId = null
         };
 
+        // 🚀 LÓGICA DE UPLOAD PARA O GOOGLE DRIVE
+        if (dto.Attachments != null && dto.Attachments.Any())
+        {
+            // Buscamos o usuário para usar o nome dele no arquivo (Ex: Fabricio_Atestado.pdf)
+            var requester = await _context.Users.FindAsync(dto.RequesterId);
+            string requesterName = requester?.FullName ?? "Usuario_Desconhecido";
+
+            foreach (var file in dto.Attachments)
+            {
+                // 1. Sobe o arquivo pro Google Drive e recebe o ID
+                var driveFileId = await _driveService.UploadFileAsync(file, requesterName);
+
+                // 2. Cria o registro na tabela de Anexos
+                var attachment = new Attachment
+                {
+                    Id = Guid.NewGuid(),
+                    RequestId = request.Id, // Vincula a esta solicitação
+                    FileName = file.FileName,
+                    GoogleDriveFileId = driveFileId // Guarda o ID para recuperar depois
+                };
+
+                _context.Attachments.Add(attachment);
+            }
+        }
+
         _context.Requests.Add(request);
         await _context.SaveChangesAsync();
 
@@ -53,53 +96,67 @@ public class RequestsController : ControllerBase
     [HttpPut("{id}/review")]
     public async Task<IActionResult> Review(Guid id, [FromBody] ReviewRequestDto dto)
     {
-        // Carregamos a request incluindo o Requester para checar o Departamento
         var request = await _context.Requests
             .Include(r => r.Requester)
             .FirstOrDefaultAsync(r => r.Id == id);
 
         if (request == null) return NotFound(new { message = "Solicitação não encontrada." });
 
+        // 🛡️ REGRA: Limite de 25% do Setor em Férias Simultâneas
+        if (dto.NewStatus == RequestStatus.Accepted && request.Type == RequestType.Vacations)
+        {
+            var totalDepto = await _context.Users.CountAsync(u => u.Department == request.Requester.Department);
+
+            var aprovadosMesmaData = await _context.Requests.CountAsync(r =>
+                r.Requester.Department == request.Requester.Department &&
+                r.Type == RequestType.Vacations &&
+                r.Status == RequestStatus.Accepted &&
+                r.TargetDate.Date == request.TargetDate.Date);
+
+            if (totalDepto > 0 && ((double)(aprovadosMesmaData + 1) / totalDepto) > 0.25)
+            {
+                return BadRequest(new { message = "Limite de contingenciamento: Mais de 25% do departamento estaria ausente nesta data." });
+            }
+        }
+
         var reviewer = await _context.Users.FindAsync(dto.ReviewerId);
         if (reviewer == null) return BadRequest(new { message = "Avaliador inválido." });
 
-        // 🛡️ REGRA 2: PERMISSÃO POR CARGO (Manager ou HR)
+        // 🛡️ REGRA: Permissão por Cargo (Manager ou HR)
         var cargosComPermissao = new List<JobTitle> { JobTitle.Manager, JobTitle.HrAnalyst };
         if (!cargosComPermissao.Contains(reviewer.JobTitle))
         {
             return StatusCode(403, new { message = "Acesso negado: Seu cargo não permite avaliar solicitações." });
         }
 
-        // 🛡️ REGRA 3: TRAVA DE DEPARTAMENTO (Apenas para Gerentes)
+        // 🛡️ REGRA: Trava de Departamento (Apenas para Gerentes)
         if (reviewer.JobTitle == JobTitle.Manager && reviewer.Department != request.Requester?.Department)
         {
             return StatusCode(403, new { message = "Acesso negado: Você só pode avaliar solicitações do seu próprio departamento." });
         }
 
-        // 🛡️ REGRA 4: CONFLITO DE INTERESSE
+        // 🛡️ REGRA: Conflito de Interesse
         if (request.RequesterId == dto.ReviewerId)
         {
             return BadRequest(new { message = "Conflito de interesse: Você não pode avaliar sua própria solicitação." });
         }
 
-        // 🛡️ REGRA 5: JUSTIFICATIVA OBRIGATÓRIA NA REPROVAÇÃO
+        // 🛡️ REGRA: Justificativa obrigatória na Reprovação
         if (dto.NewStatus == RequestStatus.Rejected && string.IsNullOrWhiteSpace(dto.Comment))
         {
             return BadRequest(new { message = "É obrigatório informar o motivo ao rejeitar uma solicitação." });
         }
 
-        // AUTOMATIZAÇÃO DE FÉRIAS
+        // Automação de Status de Usuário
         if (dto.NewStatus == RequestStatus.Accepted && request.Type == RequestType.Vacations)
         {
             var funcionario = await _context.Users.FindAsync(request.RequesterId);
             if (funcionario != null) funcionario.Status = UserStatus.OnVacation;
         }
 
-        // Atualiza a solicitação
+        // Atualização dos dados da Request
         request.Status = dto.NewStatus;
         request.ReviewerId = dto.ReviewerId;
-
-        // ✅ AGORA SALVANDO O COMENTÁRIO DO REVISOR
         request.JustificationReviewer = dto.Comment;
 
         _context.Requests.Update(request);
@@ -114,6 +171,7 @@ public class RequestsController : ControllerBase
         var request = await _context.Requests
             .Include(r => r.Requester)
             .Include(r => r.Reviewer)
+            .Include(r => r.Attachments) // Importante incluir os anexos no retorno
             .FirstOrDefaultAsync(r => r.Id == id);
 
         if (request == null) return NotFound(new { message = "Solicitação não encontrada." });

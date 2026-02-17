@@ -94,6 +94,21 @@ public class TimeEntriesController : ControllerBase
             IsManualAdjustment = false,
         };
 
+        var hoje = DateTime.UtcNow.Date;
+        var primeiroPonto = await _context.TimeEntries
+            .Where(t => t.UserId == dto.UserId && t.TimestampUtc >= hoje)
+            .OrderBy(t => t.TimestampUtc)
+            .FirstOrDefaultAsync();
+
+        if (primeiroPonto != null)
+        {
+            var duracaoJornada = DateTime.UtcNow - primeiroPonto.TimestampUtc;
+            if (duracaoJornada.TotalHours > 12)
+            {
+                return BadRequest(new { message = "Bloqueio de Segurança: Jornada de 12h excedida. Procure seu gestor." });
+            }
+        }
+
         _context.TimeEntries.Add(timeEntry);
         await _context.SaveChangesAsync();
 

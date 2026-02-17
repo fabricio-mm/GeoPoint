@@ -34,6 +34,8 @@ builder.Services.AddAuthentication(options =>
         };
     });
 
+builder.Services.AddSingleton<GoogleDriveService>();
+
 // --- A CORREÇÃO ESTÁ AQUI ---
 // Configuramos o JSON para ignorar ciclos (loops) infinitos entre as tabelas
 builder.Services.AddControllers()

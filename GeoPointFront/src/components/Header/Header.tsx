@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MapPin, LogOut, ChevronDown, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { jobTitleLabels, getViewForJobTitle } from '@/services/api';
 import './Header.css';
 
-const roleLabels = {
+const viewLabels: Record<string, string> = {
   admin: 'Administrador',
   rh: 'RH Manager',
   employee: 'Empregado',
@@ -38,7 +39,8 @@ export default function Header() {
 
   if (!user) return null;
 
-  const displayRole = roleLabels[viewMode] || 'Empregado';
+  const displayRole = viewLabels[viewMode] || 'Empregado';
+  const baseView = getViewForJobTitle(user.jobTitle);
 
   return (
     <header className="header-container">
@@ -49,12 +51,13 @@ export default function Header() {
         </div>
         <span className="header-separator">|</span>
         <span className="header-user-name">{user.name}</span>
+        <span className="header-job-title">({jobTitleLabels[user.jobTitle] || ''})</span>
       </div>
 
       <div className="header-right">
         {canSwitchToEmployee && (
           <div className="header-dropdown" ref={dropdownRef}>
-            <button 
+            <button
               className={`header-dropdown-trigger ${dropdownOpen ? 'active' : ''}`}
               onClick={() => setDropdownOpen(!dropdownOpen)}
             >
@@ -62,11 +65,11 @@ export default function Header() {
               <span>{displayRole}</span>
               <ChevronDown size={14} className={`header-chevron ${dropdownOpen ? 'rotated' : ''}`} />
             </button>
-            
+
             {dropdownOpen && (
               <div className="header-dropdown-menu">
-                {user.role === 'admin' && (
-                  <button 
+                {baseView === 'admin' && (
+                  <button
                     className={`header-dropdown-item ${viewMode === 'admin' ? 'active' : ''}`}
                     onClick={() => handleSwitchMode('admin')}
                   >
@@ -74,8 +77,8 @@ export default function Header() {
                     Administrador
                   </button>
                 )}
-                {user.role === 'rh_analyst' && (
-                  <button 
+                {baseView === 'rh' && (
+                  <button
                     className={`header-dropdown-item ${viewMode === 'rh' ? 'active' : ''}`}
                     onClick={() => handleSwitchMode('rh')}
                   >
@@ -83,7 +86,7 @@ export default function Header() {
                     RH Manager
                   </button>
                 )}
-                <button 
+                <button
                   className={`header-dropdown-item ${viewMode === 'employee' ? 'active' : ''}`}
                   onClick={() => handleSwitchMode('employee')}
                 >
@@ -94,7 +97,7 @@ export default function Header() {
             )}
           </div>
         )}
-        
+
         <button className="header-logout" onClick={handleLogout}>
           <LogOut className="header-logout-icon" />
           <span>Sair</span>

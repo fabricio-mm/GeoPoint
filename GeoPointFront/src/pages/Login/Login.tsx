@@ -18,21 +18,15 @@ export default function Login() {
     setLoading(true);
 
     const result = await login(email, password);
-    
+
     setLoading(false);
-    
+
     if (result.success) {
       navigate('/dashboard');
     } else {
       setError(result.error || 'Erro ao fazer login');
     }
   };
-
-  const demoAccounts = [
-    { role: 'Admin', email: 'admin@geopoint.com', password: 'admin123' },
-    { role: 'RH Analyst', email: 'rh@geopoint.com', password: 'rh123' },
-    { role: 'Employee', email: 'user@geopoint.com', password: 'user123' },
-  ];
 
   return (
     <div className="login-container">
@@ -45,14 +39,13 @@ export default function Login() {
 
         <form className="login-form" onSubmit={handleSubmit}>
           {error && <div className="login-error">{error}</div>}
-          
+
           <div className="login-field">
-            <label htmlFor="email" className="login-label">Email</label>
+            <label className="login-label">Email</label>
             <input
-              id="email"
               type="email"
               className="login-input"
-              placeholder="seuemail@gmail.com"
+              placeholder="seu@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -60,12 +53,11 @@ export default function Login() {
           </div>
 
           <div className="login-field">
-            <label htmlFor="password" className="login-label">Senha</label>
+            <label className="login-label">Senha</label>
             <input
-              id="password"
               type="password"
               className="login-input"
-              placeholder="**********"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -78,27 +70,7 @@ export default function Login() {
         </form>
 
         <div className="login-forgot">
-          <span className="login-forgot-link">Esqueceu sua senha?</span>
-        </div>
-
-        <div className="login-demo">
-          <p className="login-demo-title">Contas para demonstração</p>
-          <div className="login-demo-list">
-            {demoAccounts.map((account) => (
-              <div 
-                key={account.email} 
-                className="login-demo-item"
-                onClick={() => {
-                  setEmail(account.email);
-                  setPassword(account.password);
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                <span className="login-demo-role">{account.role}</span>
-                <span className="login-demo-credentials">{account.email}</span>
-              </div>
-            ))}
-          </div>
+          <a href="#">Esqueceu sua senha?</a>
         </div>
       </div>
     </div>

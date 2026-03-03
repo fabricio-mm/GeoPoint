@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Calendar, Clock, Paperclip, X } from 'lucide-react';
+import { FileText, Calendar, Clock, Paperclip, X, Baby, Stethoscope } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,7 +12,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { requestsApi, attachmentsApi, RequestType, RequestStatus } from '@/services/api';
+import { requestsApi, RequestType, RequestStatus, requestTypeLabels } from '@/services/api';
 import { toast } from 'sonner';
 
 export interface DisplayRequest {
@@ -31,32 +31,32 @@ interface NewRequestModalProps {
   userId: string;
 }
 
-const requestTypeLabels: Record<RequestType, string> = {
-  1: 'Esquecimento de Ponto',
-  2: 'Atestado Médico',
-  3: 'Férias',
-};
-
 const requestTypeIcons: Record<RequestType, React.ReactNode> = {
-  1: <Clock size={16} />,
-  2: <FileText size={16} />,
-  3: <Calendar size={16} />,
+  [RequestType.MaternityLeave]: <Baby size={16} />,
+  [RequestType.DoctorsNote]: <Stethoscope size={16} />,
+  [RequestType.ForgotPunch]: <Clock size={16} />,
+  [RequestType.Vacations]: <Calendar size={16} />,
 };
 
-const requestTypes: RequestType[] = [1, 2, 3];
+const requestTypes: RequestType[] = [
+  RequestType.MaternityLeave,
+  RequestType.DoctorsNote,
+  RequestType.ForgotPunch,
+  RequestType.Vacations,
+];
 
 export default function NewRequestModal({ isOpen, onClose, onSubmit, userId }: NewRequestModalProps) {
   const [type, setType] = useState<RequestType | null>(null);
   const [justification, setJustification] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
 
   const resetForm = () => {
     setType(null);
     setJustification('');
     setTargetDate('');
-    setFile(null);
+    setFiles([]);
   };
 
   const handleClose = () => {
@@ -64,44 +64,44 @@ export default function NewRequestModal({ isOpen, onClose, onSubmit, userId }: N
     onClose();
   };
 
+  const requiresAttachment = type === RequestType.DoctorsNote;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (type === null) { toast.error('Selecione o tipo de solicitação'); return; }
+    if (!targetDate) { toast.error('Informe a data de referência'); return; }
 
-    if (type === null) {
-      toast.error('Selecione o tipo de solicitação');
+    if (requiresAttachment && files.length === 0) {
+      toast.error('Para atestado médico, o envio do comprovante é obrigatório.');
       return;
     }
 
-    if (!justification.trim()) {
-      toast.error('Informe a justificativa');
-      return;
+    if (type === RequestType.Vacations) {
+      const target = new Date(targetDate + 'T00:00:00');
+      const minDate = new Date();
+      minDate.setDate(minDate.getDate() + 30);
+      if (target < minDate) {
+        toast.error('Férias devem ser solicitadas com no mínimo 30 dias de antecedência.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
-
     try {
       const result = await requestsApi.create({
         requesterId: userId,
         type,
-        targetDate: targetDate || undefined,
-        justification: justification.trim(),
+        targetDate,
+        justification: justification.trim() || undefined,
+        attachments: files.length > 0 ? files : undefined,
       });
-
-      if (file) {
-        try {
-          await attachmentsApi.upload(file, result.id);
-        } catch (uploadErr) {
-          console.error('Error uploading attachment:', uploadErr);
-          toast.error('Solicitação criada, mas erro ao anexar arquivo');
-        }
-      }
 
       const displayRequest: DisplayRequest = {
         id: result.id,
         type: result.type,
-        status: 0 as RequestStatus, // Always PENDING on creation
-        description: result.justificationUser,
-        containsProof: !!file || result.containsProof,
+        status: RequestStatus.Pending,
+        description: result.justificationUser || justification,
+        containsProof: files.length > 0 || result.containsProof,
         createdAt: result.createdAt ? new Date(result.createdAt) : new Date(),
       };
 
@@ -109,9 +109,11 @@ export default function NewRequestModal({ isOpen, onClose, onSubmit, userId }: N
       resetForm();
       toast.success('Solicitação enviada com sucesso!');
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating request:', err);
-      toast.error('Erro ao enviar solicitação');
+      let msg = 'Erro ao enviar solicitação';
+      try { const p = JSON.parse(err.message); if (p.message) msg = p.message; } catch {}
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -128,13 +130,8 @@ export default function NewRequestModal({ isOpen, onClose, onSubmit, userId }: N
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="type">Tipo de Solicitação *</Label>
-            <Select
-              value={type !== null ? String(type) : ''}
-              onValueChange={(value) => setType(Number(value) as RequestType)}
-            >
-              <SelectTrigger id="type">
-                <SelectValue placeholder="Selecione o tipo" />
-              </SelectTrigger>
+            <Select value={type !== null ? String(type) : ''} onValueChange={(value) => setType(Number(value) as RequestType)}>
+              <SelectTrigger id="type"><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
               <SelectContent>
                 {requestTypes.map((reqType) => (
                   <SelectItem key={reqType} value={String(reqType)}>
@@ -149,62 +146,42 @@ export default function NewRequestModal({ isOpen, onClose, onSubmit, userId }: N
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="targetDate">Data de Referência</Label>
-            <input
-              type="date"
-              id="targetDate"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
-            />
+            <Label htmlFor="targetDate">Data de Referência *</Label>
+            <input type="date" id="targetDate" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="justification">Justificativa *</Label>
-            <Textarea
-              id="justification"
-              placeholder="Descreva o motivo da sua solicitação..."
-              value={justification}
-              onChange={(e) => setJustification(e.target.value)}
-              rows={4}
-              maxLength={500}
-            />
+            <Label htmlFor="justification">Justificativa</Label>
+            <Textarea id="justification" placeholder="Descreva o motivo da sua solicitação..." value={justification} onChange={(e) => setJustification(e.target.value)} rows={4} maxLength={500} />
             <span className="text-xs text-muted-foreground text-right">{justification.length}/500</span>
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="attachment">Anexar comprovante</Label>
+            <Label htmlFor="attachment">
+              Anexar comprovante {requiresAttachment && <span className="text-destructive">*</span>}
+            </Label>
             <div className="flex items-center gap-2 border border-dashed border-border rounded-md px-3 py-2 bg-muted/30 hover:border-primary transition-colors">
               <label htmlFor="attachment" className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground flex-1">
                 <Paperclip size={18} />
-                <span>{file ? file.name : 'Clique para selecionar um arquivo'}</span>
+                <span>{files.length > 0 ? `${files.length} arquivo(s) selecionado(s)` : 'Clique para selecionar arquivos'}</span>
               </label>
-              <input
-                type="file"
-                id="attachment"
-                className="hidden"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-              />
-              {file && (
-                <button
-                  type="button"
-                  className="flex items-center justify-center w-5 h-5 rounded-full bg-destructive text-destructive-foreground"
-                  onClick={() => setFile(null)}
-                >
+              <input type="file" id="attachment" className="hidden" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} accept=".pdf,.jpg,.jpeg,.png" />
+              {files.length > 0 && (
+                <button type="button" className="flex items-center justify-center w-5 h-5 rounded-full bg-destructive text-destructive-foreground" onClick={() => setFiles([])}>
                   <X size={12} />
                 </button>
               )}
             </div>
+            {files.length > 0 && (
+              <div className="text-xs text-muted-foreground space-y-0.5">
+                {files.map((f, i) => <div key={i}>📎 {f.name}</div>)}
+              </div>
+            )}
           </div>
 
           <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={handleClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Enviando...' : 'Enviar Solicitação'}
-            </Button>
+            <Button type="button" variant="outline" onClick={handleClose}>Cancelar</Button>
+            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Enviando...' : 'Enviar Solicitação'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

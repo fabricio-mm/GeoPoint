@@ -1,7 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Filter, X, User, FileText, CalendarDays, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import Header from '@/components/Header/Header';
-import { requestsApi, Request as ApiRequest, usersApi, User as ApiUser, RequestType, RequestStatus } from '@/services/api';
+import {
+  requestsApi,
+  usersApi,
+  ApiRequest,
+  User as ApiUser,
+  RequestType,
+  RequestStatus,
+  requestTypeLabels,
+  requestStatusLabels,
+  canReviewRequests,
+  JobTitle,
+} from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import './RHDashboard.css';
@@ -18,18 +29,6 @@ interface DisplayRequest {
   createdAt?: string;
 }
 
-const requestTypeLabels: Record<RequestType, string> = {
-  1: 'Esquecimento de Ponto',
-  2: 'Atestado Médico',
-  3: 'Férias',
-};
-
-const statusLabels: Record<RequestStatus, string> = {
-  0: 'Pendente',
-  1: 'Aprovado',
-  2: 'Rejeitado',
-};
-
 const statusCssClass = (status: RequestStatus): string => {
   return ['pending', 'approved', 'rejected'][status] || 'pending';
 };
@@ -40,6 +39,7 @@ export default function RHDashboard() {
   const [users, setUsers] = useState<Map<string, ApiUser>>(new Map());
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedRequest, setSelectedRequest] = useState<DisplayRequest | null>(null);
+  const [rejectComment, setRejectComment] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -74,7 +74,7 @@ export default function RHDashboard() {
     loadData();
   }, [loadData]);
 
-  const pendingCount = requests.filter(r => r.status === 0).length;
+  const pendingCount = requests.filter(r => r.status === RequestStatus.Pending).length;
 
   const filteredRequests = requests.filter(request => {
     if (statusFilter === 'all') return true;
@@ -90,26 +90,39 @@ export default function RHDashboard() {
   const handleApprove = async (requestId: string) => {
     if (!user) return;
     try {
-      await requestsApi.review(requestId, { reviewerId: user.id, newStatus: 1 });
-      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 1 as RequestStatus } : r));
+      await requestsApi.review(requestId, { reviewerId: user.id, newStatus: RequestStatus.Accepted });
+      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: RequestStatus.Accepted } : r));
       setSelectedRequest(null);
       toast.success('Solicitação aprovada com sucesso!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error approving request:', err);
-      toast.error('Erro ao aprovar solicitação');
+      let msg = 'Erro ao aprovar solicitação';
+      try { const p = JSON.parse(err.message); if (p.message) msg = p.message; } catch {}
+      toast.error(msg);
     }
   };
 
   const handleReject = async (requestId: string) => {
     if (!user) return;
+    if (!rejectComment.trim()) {
+      toast.error('É obrigatório informar o motivo ao rejeitar uma solicitação.');
+      return;
+    }
     try {
-      await requestsApi.review(requestId, { reviewerId: user.id, newStatus: 2 });
-      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 2 as RequestStatus } : r));
+      await requestsApi.review(requestId, {
+        reviewerId: user.id,
+        newStatus: RequestStatus.Rejected,
+        comment: rejectComment.trim(),
+      });
+      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: RequestStatus.Rejected } : r));
       setSelectedRequest(null);
+      setRejectComment('');
       toast.error('Solicitação rejeitada');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error rejecting request:', err);
-      toast.error('Erro ao rejeitar solicitação');
+      let msg = 'Erro ao rejeitar solicitação';
+      try { const p = JSON.parse(err.message); if (p.message) msg = p.message; } catch {}
+      toast.error(msg);
     }
   };
 
@@ -177,7 +190,7 @@ export default function RHDashboard() {
                           {status === 'pending' && <Clock size={12} />}
                           {status === 'approved' && <CheckCircle2 size={12} />}
                           {status === 'rejected' && <XCircle size={12} />}
-                          {statusLabels[request.status]}
+                          {requestStatusLabels[request.status]}
                         </span>
                       </div>
 
@@ -204,7 +217,10 @@ export default function RHDashboard() {
                       <div className="rh-request-card-action">
                         <button
                           className="rh-analyze-btn"
-                          onClick={() => setSelectedRequest(request)}
+                          onClick={() => {
+                            setSelectedRequest(request);
+                            setRejectComment('');
+                          }}
                         >
                           Analisar
                         </button>
@@ -279,6 +295,27 @@ export default function RHDashboard() {
                     📎 Esta solicitação contém comprovante anexado
                   </div>
                 )}
+              </div>
+
+              <div className="rh-modal-description" style={{ marginTop: '1rem' }}>
+                <span className="rh-modal-label">Motivo da rejeição (obrigatório para rejeitar)</span>
+                <textarea
+                  className="rh-modal-description-text"
+                  style={{
+                    width: '100%',
+                    minHeight: '80px',
+                    padding: '0.5rem',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem',
+                    resize: 'vertical',
+                    background: 'hsl(var(--background))',
+                    color: 'hsl(var(--foreground))',
+                  }}
+                  placeholder="Informe o motivo caso vá rejeitar..."
+                  value={rejectComment}
+                  onChange={(e) => setRejectComment(e.target.value)}
+                />
               </div>
 
               <div className="rh-modal-status-indicator">

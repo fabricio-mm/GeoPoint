@@ -1,9 +1,27 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import { User, ViewMode } from '@/types';
-import { mockUsers, loginCredentials } from '@/data/mockData';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+import {
+  authApi,
+  User,
+  JobTitle,
+  setAuthToken,
+  getAuthToken,
+  getViewForJobTitle,
+} from '@/services/api';
+
+export type ViewMode = 'admin' | 'rh' | 'employee';
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  jobTitle: JobTitle;
+  department: number;
+  role: number;
+}
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
+  apiUser: User | null;
   viewMode: ViewMode;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -14,55 +32,85 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const mapApiUser = (u: User): AuthUser => ({
+  id: u.id,
+  name: u.fullName,
+  email: u.email,
+  jobTitle: u.jobTitle,
+  department: u.department,
+  role: u.role,
+});
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [apiUser, setApiUser] = useState<User | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('employee');
 
-  const login = useCallback(async (email: string, password: string) => {
-    const credentials = loginCredentials[email as keyof typeof loginCredentials];
-    
-    if (!credentials) {
-      return { success: false, error: 'Usuário não encontrado' };
-    }
-    
-    if (credentials.password !== password) {
-      return { success: false, error: 'Senha incorreta' };
-    }
-
-    const foundUser = mockUsers.find(u => u.id === credentials.userId);
-    if (foundUser) {
-      setUser(foundUser);
-      // Set initial view mode based on role
-      if (foundUser.role === 'admin') {
-        setViewMode('admin');
-      } else if (foundUser.role === 'rh_analyst') {
-        setViewMode('rh');
-      } else {
-        setViewMode('employee');
+  // Restore session from stored token on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('geopoint_user');
+    if (stored && getAuthToken()) {
+      try {
+        const parsed: User = JSON.parse(stored);
+        setUser(mapApiUser(parsed));
+        setApiUser(parsed);
+        setViewMode(getViewForJobTitle(parsed.jobTitle));
+      } catch {
+        localStorage.removeItem('geopoint_user');
+        setAuthToken(null);
       }
-      return { success: true };
     }
-    
-    return { success: false, error: 'Erro ao fazer login' };
+  }, []);
+
+  const login = useCallback(async (email: string, password: string) => {
+    try {
+      const response = await authApi.login(email, password);
+      setAuthToken(response.token);
+      localStorage.setItem('geopoint_user', JSON.stringify(response.user));
+
+      const authUser = mapApiUser(response.user);
+      setUser(authUser);
+      setApiUser(response.user);
+      setViewMode(getViewForJobTitle(response.user.jobTitle));
+
+      return { success: true };
+    } catch (err: any) {
+      console.error('Login error:', err);
+      let message = 'Erro ao fazer login';
+      try {
+        const parsed = JSON.parse(err.message);
+        if (parsed.message) message = parsed.message;
+      } catch {
+        if (err.message && !err.message.startsWith('HTTP')) message = err.message;
+      }
+      return { success: false, error: message };
+    }
   }, []);
 
   const logout = useCallback(() => {
     setUser(null);
+    setApiUser(null);
     setViewMode('employee');
+    setAuthToken(null);
+    localStorage.removeItem('geopoint_user');
   }, []);
 
   const switchViewMode = useCallback((mode: ViewMode) => {
-    if (user?.role === 'admin' || user?.role === 'rh_analyst') {
+    if (!user) return;
+    const baseView = getViewForJobTitle(user.jobTitle);
+    // Admin/RH can switch down to employee view
+    if (baseView === 'admin' || baseView === 'rh') {
       setViewMode(mode);
     }
   }, [user]);
 
-  const canSwitchToEmployee = user?.role === 'admin' || user?.role === 'rh_analyst';
+  const canSwitchToEmployee = user ? getViewForJobTitle(user.jobTitle) !== 'employee' : false;
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        apiUser,
         viewMode,
         isAuthenticated: !!user,
         login,

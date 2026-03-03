@@ -4,33 +4,30 @@ import {
   usersApi,
   workSchedulesApi,
   timeEntriesApi,
+  locationsApi,
   User as ApiUser,
   WorkSchedule as ApiWorkSchedule,
   TimeEntry,
-  UserRole,
+  TimeEntryType,
   UserStatus,
-  parseHoursTarget
+  Location as ApiLocation,
+  LocationType,
+  locationTypeLabels,
+  calcScheduleHours,
+  userRoleLabels,
+  jobTitleLabels,
+  departmentLabels,
 } from '@/services/api';
-import { User, Clock, Calendar, CheckCircle, AlertCircle, XCircle, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { User, Clock, Calendar, CheckCircle, AlertCircle, XCircle, ChevronLeft, ChevronRight, FileText, MapPin, Plus } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import './AdminDashboard.css';
 
-type TabType = 'apontamentos' | 'usuarios' | 'jornadas';
+type TabType = 'apontamentos' | 'usuarios' | 'jornadas' | 'localidades';
 type PeriodFilter = 'day' | 'week' | 'month';
-
-const ENTRY = 1;
-const EXIT = 2;
-
-const roleLabels: Record<UserRole, string> = {
-  ADMIN: 'Administrador',
-  HR: 'Analista RH',
-  EMPLOYEE: 'Funcionário',
-};
-
-const statusLabels: Record<UserStatus, string> = {
-  ACTIVE: 'Ativo',
-  INACTIVE: 'Inativo',
-};
 
 interface DayRecord {
   date: Date;
@@ -69,15 +66,32 @@ export default function AdminDashboard() {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Locations state
+  const [allLocations, setAllLocations] = useState<ApiLocation[]>([]);
+  const [selectedLocationUser, setSelectedLocationUser] = useState<string>('all');
+  const [locationSearch, setLocationSearch] = useState('');
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [locationForm, setLocationForm] = useState({
+    userId: '',
+    name: '',
+    type: LocationType.Office as number,
+    latitude: '',
+    longitude: '',
+    radiusMeters: '100',
+  });
+  const [isCreatingLocation, setIsCreatingLocation] = useState(false);
+
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [usersData, schedulesData] = await Promise.all([
+      const [usersData, schedulesData, locationsData] = await Promise.all([
         usersApi.getAll(),
         workSchedulesApi.getAll(),
+        locationsApi.getAll(),
       ]);
       setUsers(usersData);
       setWorkSchedules(schedulesData);
+      setAllLocations(locationsData);
 
       const allEntries: TimeEntry[] = [];
       for (const user of usersData) {
@@ -101,7 +115,7 @@ export default function AdminDashboard() {
   }, [loadData]);
 
   const totalUsers = users.length;
-  const activeUsers = users.filter(u => u.status === 'ACTIVE').length;
+  const activeUsers = users.filter(u => u.status === UserStatus.Active).length;
   const totalRecords = timeEntries.length;
   const todayRecords = timeEntries.filter(r => {
     const today = new Date();
@@ -134,18 +148,20 @@ export default function AdminDashboard() {
 
       const dayRecord = recordsMap.get(key)!;
 
-      if (record.type === ENTRY) {
-        if (!dayRecord.entry) {
-          dayRecord.entry = timestamp;
-        } else if (!dayRecord.breakEnd) {
-          dayRecord.breakEnd = timestamp;
-        }
-      } else if (record.type === EXIT) {
-        if (!dayRecord.breakStart && dayRecord.entry) {
-          dayRecord.breakStart = timestamp;
-        } else {
-          dayRecord.exit = timestamp;
-        }
+      // Map the 4-step types
+      switch (record.type) {
+        case TimeEntryType.Entry:
+          if (!dayRecord.entry) dayRecord.entry = timestamp;
+          break;
+        case TimeEntryType.LaunchTime:
+          if (!dayRecord.breakStart) dayRecord.breakStart = timestamp;
+          break;
+        case TimeEntryType.ReturnToWork:
+          if (!dayRecord.breakEnd) dayRecord.breakEnd = timestamp;
+          break;
+        case TimeEntryType.Exit:
+          if (!dayRecord.exit) dayRecord.exit = timestamp;
+          break;
       }
     });
 
@@ -193,15 +209,11 @@ export default function AdminDashboard() {
     today.setHours(0, 0, 0, 0);
     const checkDate = new Date(date);
     checkDate.setHours(0, 0, 0, 0);
-
     if (checkDate > today) return 'future';
-
     const records = getRecordsForDate(date);
     if (records.length === 0) return 'empty';
-
     const hasIncomplete = records.some(r => r.status === 'incomplete');
     const hasPending = records.some(r => r.status === 'pending');
-
     if (hasIncomplete) return 'incomplete';
     if (hasPending) return 'pending';
     return 'complete';
@@ -210,7 +222,6 @@ export default function AdminDashboard() {
   const getWeekDays = () => {
     const startOfWeek = new Date(selectedDate);
     startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
-
     const days = [];
     for (let i = 0; i < 7; i++) {
       const day = new Date(startOfWeek);
@@ -225,17 +236,9 @@ export default function AdminDashboard() {
     const month = selectedDate.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-
     const days: (Date | null)[] = [];
-
-    for (let i = 0; i < firstDay.getDay(); i++) {
-      days.push(null);
-    }
-
-    for (let i = 1; i <= lastDay.getDate(); i++) {
-      days.push(new Date(year, month, i));
-    }
-
+    for (let i = 0; i < firstDay.getDay(); i++) days.push(null);
+    for (let i = 1; i <= lastDay.getDate(); i++) days.push(new Date(year, month, i));
     return days;
   };
 
@@ -245,12 +248,7 @@ export default function AdminDashboard() {
   }, [consolidatedRecords, searchTerm, selectedUser, selectedDate, selectedCalendarDate]);
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', {
-      weekday: 'long',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+    return date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   const formatTime = (date: Date | undefined) => {
@@ -260,28 +258,18 @@ export default function AdminDashboard() {
 
   const navigatePeriod = (direction: 'prev' | 'next') => {
     const newDate = new Date(selectedDate);
-    if (periodFilter === 'day') {
-      newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
-    } else if (periodFilter === 'week') {
-      newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
-    } else {
-      newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
-    }
+    if (periodFilter === 'day') newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
+    else if (periodFilter === 'week') newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+    else newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
     setSelectedDate(newDate);
     setSelectedCalendarDate(null);
     setSelectedDayRecord(null);
   };
 
   const getStatusInfo = (record: DayRecord) => {
-    if (record.status === 'complete') {
-      return { label: 'Completo', icon: CheckCircle, className: 'status-complete' };
-    }
-    if (record.status === 'justified') {
-      return { label: 'Justificado', icon: FileText, className: 'status-justified' };
-    }
-    if (record.status === 'pending') {
-      return { label: 'Pendente', icon: Clock, className: 'status-pending' };
-    }
+    if (record.status === 'complete') return { label: 'Completo', icon: CheckCircle, className: 'status-complete' };
+    if (record.status === 'justified') return { label: 'Justificado', icon: FileText, className: 'status-justified' };
+    if (record.status === 'pending') return { label: 'Pendente', icon: Clock, className: 'status-pending' };
     return { label: 'Horas Faltantes', icon: AlertCircle, className: 'status-incomplete' };
   };
 
@@ -304,10 +292,60 @@ export default function AdminDashboard() {
     return selectedDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   };
 
+  const handleCreateLocation = async () => {
+    if (!locationForm.userId) {
+      toast.error('Selecione um usuário');
+      return;
+    }
+    if (!locationForm.name || !locationForm.latitude || !locationForm.longitude) {
+      toast.error('Preencha todos os campos obrigatórios');
+      return;
+    }
+    setIsCreatingLocation(true);
+    try {
+      const newLocation = await locationsApi.create({
+        userId: locationForm.userId,
+        name: locationForm.name,
+        type: locationForm.type,
+        latitude: parseFloat(locationForm.latitude),
+        longitude: parseFloat(locationForm.longitude),
+        radiusMeters: parseFloat(locationForm.radiusMeters) || 100,
+      });
+      setAllLocations(prev => [...prev, newLocation]);
+      setShowLocationModal(false);
+      setLocationForm({ userId: '', name: '', type: LocationType.Office, latitude: '', longitude: '', radiusMeters: '100' });
+      toast.success('Local de trabalho adicionado com sucesso');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao criar local de trabalho');
+    }
+    setIsCreatingLocation(false);
+  };
+
+  const filteredLocations = useMemo(() => {
+    return allLocations.filter(loc => {
+      const matchesUser = selectedLocationUser === 'all' || loc.userId === selectedLocationUser;
+      const userName = users.find(u => u.id === loc.userId)?.fullName || '';
+      const matchesSearch = locationSearch === '' ||
+        loc.name.toLowerCase().includes(locationSearch.toLowerCase()) ||
+        userName.toLowerCase().includes(locationSearch.toLowerCase());
+      return matchesUser && matchesSearch;
+    });
+  }, [allLocations, selectedLocationUser, locationSearch, users]);
+
+  const locationStats = useMemo(() => {
+    const totalLocations = allLocations.length;
+    const officeCount = allLocations.filter(l => l.type === LocationType.Office).length;
+    const homeCount = allLocations.filter(l => l.type === LocationType.Home).length;
+    const usersWithLocation = new Set(allLocations.map(l => l.userId)).size;
+    return { totalLocations, officeCount, homeCount, usersWithLocation };
+  }, [allLocations]);
+
   const tabs = [
     { id: 'apontamentos' as TabType, label: 'Todos os apontamentos' },
     { id: 'usuarios' as TabType, label: 'Usuários' },
     { id: 'jornadas' as TabType, label: 'Jornadas de trabalho' },
+    { id: 'localidades' as TabType, label: 'Localidades' },
   ];
 
   return (
@@ -352,51 +390,22 @@ export default function AdminDashboard() {
                 <h2 className="records-title">Apontamentos por Dia</h2>
                 <div className="records-filters">
                   <div className="period-filter">
-                    <button
-                      className={`period-filter-btn ${periodFilter === 'day' ? 'active' : ''}`}
-                      onClick={() => { setPeriodFilter('day'); setSelectedCalendarDate(null); }}
-                    >
-                      Dia
-                    </button>
-                    <button
-                      className={`period-filter-btn ${periodFilter === 'week' ? 'active' : ''}`}
-                      onClick={() => { setPeriodFilter('week'); setSelectedCalendarDate(null); }}
-                    >
-                      Semana
-                    </button>
-                    <button
-                      className={`period-filter-btn ${periodFilter === 'month' ? 'active' : ''}`}
-                      onClick={() => { setPeriodFilter('month'); setSelectedCalendarDate(null); }}
-                    >
-                      Mês
-                    </button>
+                    <button className={`period-filter-btn ${periodFilter === 'day' ? 'active' : ''}`} onClick={() => { setPeriodFilter('day'); setSelectedCalendarDate(null); }}>Dia</button>
+                    <button className={`period-filter-btn ${periodFilter === 'week' ? 'active' : ''}`} onClick={() => { setPeriodFilter('week'); setSelectedCalendarDate(null); }}>Semana</button>
+                    <button className={`period-filter-btn ${periodFilter === 'month' ? 'active' : ''}`} onClick={() => { setPeriodFilter('month'); setSelectedCalendarDate(null); }}>Mês</button>
                   </div>
 
                   <div className="date-navigator">
-                    <button className="date-nav-btn" onClick={() => navigatePeriod('prev')}>
-                      <ChevronLeft size={20} />
-                    </button>
+                    <button className="date-nav-btn" onClick={() => navigatePeriod('prev')}><ChevronLeft size={20} /></button>
                     <div className="date-display">
                       <Calendar size={16} />
                       <span className="date-label">{getPeriodLabel()}</span>
                     </div>
-                    <button className="date-nav-btn" onClick={() => navigatePeriod('next')}>
-                      <ChevronRight size={20} />
-                    </button>
+                    <button className="date-nav-btn" onClick={() => navigatePeriod('next')}><ChevronRight size={20} /></button>
                   </div>
 
-                  <input
-                    type="text"
-                    className="records-search"
-                    placeholder="Buscar por nome"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                  <select
-                    className="records-select"
-                    value={selectedUser}
-                    onChange={(e) => setSelectedUser(e.target.value)}
-                  >
+                  <input type="text" className="records-search" placeholder="Buscar por nome" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  <select className="records-select" value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)}>
                     <option value="all">Todos os Usuários</option>
                     {users.map((user) => (
                       <option key={user.id} value={user.id}>{user.fullName}</option>
@@ -412,7 +421,6 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 <>
-                  {/* Week View */}
                   {periodFilter === 'week' && !selectedCalendarDate && (
                     <div className="admin-week-view">
                       <div className="week-grid">
@@ -420,13 +428,8 @@ export default function AdminDashboard() {
                           const status = getDateStatus(day);
                           const isToday = day.toDateString() === new Date().toDateString();
                           const dayRecords = getRecordsForDate(day);
-
                           return (
-                            <div
-                              key={index}
-                              className={`week-day-card ${status} ${isToday ? 'today' : ''}`}
-                              onClick={() => handleDayClick(day)}
-                            >
+                            <div key={index} className={`week-day-card ${status} ${isToday ? 'today' : ''}`} onClick={() => handleDayClick(day)}>
                               <div className="week-day-header">
                                 <span className="week-day-name">{WEEKDAYS_FULL[index]}</span>
                                 <span className="week-day-date">{day.getDate()}/{day.getMonth() + 1}</span>
@@ -440,19 +443,13 @@ export default function AdminDashboard() {
                                         <span>{record.userName.split(' ')[0]}</span>
                                       </div>
                                     ))}
-                                    {dayRecords.length > 3 && (
-                                      <span className="more-users">+{dayRecords.length - 3}</span>
-                                    )}
+                                    {dayRecords.length > 3 && <span className="more-users">+{dayRecords.length - 3}</span>}
                                   </div>
                                 ) : (
                                   <span className="no-records">Sem registros</span>
                                 )}
                               </div>
-                              {status === 'incomplete' && (
-                                <div className="week-day-alert">
-                                  <AlertCircle size={14} />
-                                </div>
-                              )}
+                              {status === 'incomplete' && <div className="week-day-alert"><AlertCircle size={14} /></div>}
                             </div>
                           );
                         })}
@@ -460,7 +457,6 @@ export default function AdminDashboard() {
                     </div>
                   )}
 
-                  {/* Month View */}
                   {periodFilter === 'month' && !selectedCalendarDate && (
                     <div className="admin-month-view">
                       <div className="month-header">
@@ -470,20 +466,12 @@ export default function AdminDashboard() {
                       </div>
                       <div className="month-grid">
                         {getMonthDays().map((day, index) => {
-                          if (!day) {
-                            return <div key={index} className="month-day empty"></div>;
-                          }
-
+                          if (!day) return <div key={index} className="month-day empty"></div>;
                           const status = getDateStatus(day);
                           const isToday = day.toDateString() === new Date().toDateString();
                           const dayRecords = getRecordsForDate(day);
-
                           return (
-                            <div
-                              key={index}
-                              className={`month-day ${status} ${isToday ? 'today' : ''}`}
-                              onClick={() => handleDayClick(day)}
-                            >
+                            <div key={index} className={`month-day ${status} ${isToday ? 'today' : ''}`} onClick={() => handleDayClick(day)}>
                               <span className="month-day-number">{day.getDate()}</span>
                               {dayRecords.length > 0 && (
                                 <div className="month-day-indicator">
@@ -497,14 +485,10 @@ export default function AdminDashboard() {
                     </div>
                   )}
 
-                  {/* Day View */}
                   {(periodFilter === 'day' || selectedCalendarDate) && (
                     <div className="admin-day-view">
                       {selectedCalendarDate && (
-                        <button
-                          className="back-to-calendar"
-                          onClick={() => setSelectedCalendarDate(null)}
-                        >
+                        <button className="back-to-calendar" onClick={() => setSelectedCalendarDate(null)}>
                           ← Voltar para {periodFilter === 'week' ? 'semana' : 'mês'}
                         </button>
                       )}
@@ -520,7 +504,6 @@ export default function AdminDashboard() {
                             {filteredRecords.map((record, index) => {
                               const statusInfo = getStatusInfo(record);
                               const StatusIcon = statusInfo.icon;
-
                               return (
                                 <div
                                   key={`${record.userId}-${record.dateString}`}
@@ -528,14 +511,10 @@ export default function AdminDashboard() {
                                   onClick={() => setSelectedDayRecord(record)}
                                   style={{ animationDelay: `${index * 0.05}s` }}
                                 >
-                                  <div className="day-record-avatar">
-                                    <User size={20} />
-                                  </div>
+                                  <div className="day-record-avatar"><User size={20} /></div>
                                   <div className="day-record-info">
                                     <span className="day-record-name">{record.userName}</span>
-                                    <span className="day-record-hours">
-                                      {record.workedHours.toFixed(1)}h / {record.requiredHours}h
-                                    </span>
+                                    <span className="day-record-hours">{record.workedHours.toFixed(1)}h / {record.requiredHours}h</span>
                                   </div>
                                   <div className={`day-record-status ${statusInfo.className}`}>
                                     <StatusIcon size={16} />
@@ -550,20 +529,13 @@ export default function AdminDashboard() {
                             <div className="day-record-detail">
                               <div className="detail-header">
                                 <div className="detail-user">
-                                  <div className="detail-avatar">
-                                    <User size={24} />
-                                  </div>
+                                  <div className="detail-avatar"><User size={24} /></div>
                                   <div className="detail-user-info">
                                     <h3>{selectedDayRecord.userName}</h3>
                                     <span>{formatDate(selectedDayRecord.date)}</span>
                                   </div>
                                 </div>
-                                <button
-                                  className="detail-close"
-                                  onClick={() => setSelectedDayRecord(null)}
-                                >
-                                  ×
-                                </button>
+                                <button className="detail-close" onClick={() => setSelectedDayRecord(null)}>×</button>
                               </div>
 
                               <div className="detail-times">
@@ -628,7 +600,8 @@ export default function AdminDashboard() {
                   <tr>
                     <th>Nome</th>
                     <th>Email</th>
-                    <th>Perfil</th>
+                    <th>Cargo</th>
+                    <th>Departamento</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -638,11 +611,12 @@ export default function AdminDashboard() {
                       <td>{user.fullName}</td>
                       <td>{user.email}</td>
                       <td>
-                        <span className="user-role-badge">{roleLabels[user.role] || 'Usuário'}</span>
+                        <span className="user-role-badge">{jobTitleLabels[user.jobTitle] || 'N/A'}</span>
                       </td>
+                      <td>{departmentLabels[user.department] || 'N/A'}</td>
                       <td>
-                        <span className={`user-status-badge ${user.status === 'ACTIVE' ? 'active' : 'inactive'}`}>
-                          {statusLabels[user.status] || 'Ativo'}
+                        <span className={`user-status-badge ${user.status === UserStatus.Active ? 'active' : 'inactive'}`}>
+                          {user.status === UserStatus.Active ? 'Ativo' : 'Inativo'}
                         </span>
                       </td>
                     </tr>
@@ -656,9 +630,7 @@ export default function AdminDashboard() {
         {activeTab === 'jornadas' && (
           <div className="schedules-section">
             <div className="schedules-header">
-              <div className="schedules-icon">
-                <Clock size={24} />
-              </div>
+              <div className="schedules-icon"><Clock size={24} /></div>
               <div>
                 <h2 className="schedules-title">Jornadas de Trabalho</h2>
                 <p className="schedules-subtitle">Configurações de horários e tolerâncias</p>
@@ -670,34 +642,24 @@ export default function AdminDashboard() {
             ) : (
               <div className="schedules-grid">
                 {workSchedules.map((schedule, index) => {
-                  const hoursTarget = parseHoursTarget(schedule.dailyHoursTarget);
-
+                  const hours = calcScheduleHours(schedule);
                   return (
-                    <div
-                      key={schedule.id}
-                      className="schedule-card"
-                      style={{ animationDelay: `${index * 0.1}s` }}
-                    >
+                    <div key={schedule.id} className="schedule-card" style={{ animationDelay: `${index * 0.1}s` }}>
                       <div className="schedule-card-header">
-                        <div className="schedule-card-icon">
-                          <Calendar size={20} />
-                        </div>
-                        <span className="schedule-badge">{hoursTarget}h</span>
+                        <div className="schedule-card-icon"><Calendar size={20} /></div>
+                        <span className="schedule-badge">{hours}h</span>
                       </div>
-
                       <h3 className="schedule-card-name">{schedule.name}</h3>
-
                       <div className="schedule-card-details">
                         <div className="schedule-detail">
                           <Clock size={14} />
-                          <span>{hoursTarget} horas por dia</span>
+                          <span>{schedule.startTime} - {schedule.endTime}</span>
                         </div>
                         <div className="schedule-detail">
                           <AlertCircle size={14} />
                           <span>Tolerância: {schedule.toleranceMinutes} minutos</span>
                         </div>
                       </div>
-
                       <div className="schedule-card-footer">
                         <span className="schedule-status active">Ativo</span>
                       </div>
@@ -706,6 +668,205 @@ export default function AdminDashboard() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'localidades' && (
+          <div className="locations-section">
+            <div className="schedules-header">
+              <div className="schedules-icon"><MapPin size={24} /></div>
+              <div>
+                <h2 className="schedules-title">Localidades de Trabalho</h2>
+                <p className="schedules-subtitle">Gerencie os locais de trabalho dos usuários</p>
+              </div>
+            </div>
+
+            <div className="admin-stats">
+              <div className="stat-card">
+                <div className="stat-card-title">Total de Locais</div>
+                <div className="stat-card-value">{locationStats.totalLocations}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-card-title">Escritórios</div>
+                <div className="stat-card-value">{locationStats.officeCount}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-card-title">Home Office</div>
+                <div className="stat-card-value">{locationStats.homeCount}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-card-title">Usuários c/ Local</div>
+                <div className="stat-card-value">{locationStats.usersWithLocation}</div>
+              </div>
+            </div>
+
+            <div className="records-card">
+              <div className="records-header">
+                <h2 className="records-title">Todos os Locais Cadastrados</h2>
+                <div className="records-filters">
+                  <input
+                    type="text"
+                    className="records-search"
+                    placeholder="Buscar por nome ou usuário..."
+                    value={locationSearch}
+                    onChange={(e) => setLocationSearch(e.target.value)}
+                  />
+                  <select
+                    className="records-select"
+                    value={selectedLocationUser}
+                    onChange={(e) => setSelectedLocationUser(e.target.value)}
+                  >
+                    <option value="all">Todos os Usuários</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>{u.fullName}</option>
+                    ))}
+                  </select>
+                  <Button onClick={() => setShowLocationModal(true)} size="sm" className="location-add-btn">
+                    <Plus size={16} /> Nova Localidade
+                  </Button>
+                </div>
+              </div>
+
+              {isLoading ? (
+                <div className="records-empty">
+                  <Clock size={48} className="empty-icon" />
+                  <p>Carregando...</p>
+                </div>
+              ) : filteredLocations.length === 0 ? (
+                <div className="records-empty">
+                  <MapPin size={48} className="empty-icon" />
+                  <p>{allLocations.length === 0 ? 'Nenhum local cadastrado ainda' : 'Nenhum local encontrado com os filtros aplicados'}</p>
+                </div>
+              ) : (
+                <div className="locations-table-wrapper">
+                  <table className="users-table">
+                    <thead>
+                      <tr>
+                        <th>Nome do Local</th>
+                        <th>Tipo</th>
+                        <th>Usuário</th>
+                        <th>Latitude</th>
+                        <th>Longitude</th>
+                        <th>Raio</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredLocations.map((loc) => {
+                        const locUser = users.find(u => u.id === loc.userId);
+                        return (
+                          <tr key={loc.id}>
+                            <td>
+                              <div className="location-name-cell">
+                                <MapPin size={14} />
+                                <span>{loc.name}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <span className={`location-type-badge ${loc.type === LocationType.Office ? 'office' : 'home'}`}>
+                                {locationTypeLabels[loc.type as LocationType] || `Tipo ${loc.type}`}
+                              </span>
+                            </td>
+                            <td>{locUser?.fullName || (loc.userId ? 'Usuário desconhecido' : 'Global')}</td>
+                            <td className="location-coord">{loc.latitude}</td>
+                            <td className="location-coord">{loc.longitude}</td>
+                            <td>
+                              <span className="location-radius-badge">{loc.radiusMeters}m</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <Dialog open={showLocationModal} onOpenChange={setShowLocationModal}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Nova Localidade de Trabalho</DialogTitle>
+                </DialogHeader>
+                <div className="location-form">
+                  <div>
+                    <Label htmlFor="loc-user">Usuário</Label>
+                    <select
+                      id="loc-user"
+                      className="records-select"
+                      style={{ width: '100%', marginTop: '0.25rem' }}
+                      value={locationForm.userId}
+                      onChange={(e) => setLocationForm(f => ({ ...f, userId: e.target.value }))}
+                    >
+                      <option value="">-- Selecione o usuário --</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>{u.fullName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="loc-name">Nome do local</Label>
+                    <Input
+                      id="loc-name"
+                      placeholder="Ex: Escritório Centro"
+                      value={locationForm.name}
+                      onChange={(e) => setLocationForm(f => ({ ...f, name: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="loc-type">Tipo</Label>
+                    <select
+                      id="loc-type"
+                      className="records-select"
+                      style={{ width: '100%', marginTop: '0.25rem' }}
+                      value={locationForm.type}
+                      onChange={(e) => setLocationForm(f => ({ ...f, type: parseInt(e.target.value) }))}
+                    >
+                      <option value={LocationType.Office}>Escritório</option>
+                      <option value={LocationType.Home}>Home Office</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div>
+                      <Label htmlFor="loc-lat">Latitude</Label>
+                      <Input
+                        id="loc-lat"
+                        type="number"
+                        step="any"
+                        placeholder="-23.5505"
+                        value={locationForm.latitude}
+                        onChange={(e) => setLocationForm(f => ({ ...f, latitude: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="loc-lng">Longitude</Label>
+                      <Input
+                        id="loc-lng"
+                        type="number"
+                        step="any"
+                        placeholder="-46.6333"
+                        value={locationForm.longitude}
+                        onChange={(e) => setLocationForm(f => ({ ...f, longitude: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="loc-radius">Raio (metros)</Label>
+                    <Input
+                      id="loc-radius"
+                      type="number"
+                      placeholder="100"
+                      value={locationForm.radiusMeters}
+                      onChange={(e) => setLocationForm(f => ({ ...f, radiusMeters: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowLocationModal(false)}>Cancelar</Button>
+                  <Button onClick={handleCreateLocation} disabled={isCreatingLocation}>
+                    {isCreatingLocation ? 'Salvando...' : 'Salvar'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
       </main>

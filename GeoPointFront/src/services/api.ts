@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://localhost:7145";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://localhost:7145';
 
 // ==================== ENUMS ====================
 
@@ -65,63 +65,63 @@ export enum RequestType {
 }
 
 export enum RequestStatus {
-  Pending = 0,
-  Accepted = 1,
-  Rejected = 2,
+  Pending = 1,
+  Accepted = 2,
+  Rejected = 3,
 }
 
 // ==================== LABELS ====================
 
 export const userRoleLabels: Record<UserRole, string> = {
-  [UserRole.Intern]: "Estagiário",
-  [UserRole.Employee]: "Funcionário",
-  [UserRole.Trainee]: "Trainee",
-  [UserRole.Contractor]: "Terceirizado",
+  [UserRole.Intern]: 'Estagiário',
+  [UserRole.Employee]: 'Funcionário',
+  [UserRole.Trainee]: 'Trainee',
+  [UserRole.Contractor]: 'Terceirizado',
 };
 
 export const jobTitleLabels: Record<JobTitle, string> = {
-  [JobTitle.SoftwareEngineer]: "Engenheiro de Software",
-  [JobTitle.Developer]: "Desenvolvedor",
-  [JobTitle.TechLead]: "Tech Lead",
-  [JobTitle.ProductOwner]: "Product Owner",
-  [JobTitle.ScrumMaster]: "Scrum Master",
-  [JobTitle.Architect]: "Arquiteto",
-  [JobTitle.HrAnalyst]: "Analista de RH",
-  [JobTitle.Manager]: "Gerente",
-  [JobTitle.DataEngineer]: "Engenheiro de Dados",
-  [JobTitle.Support]: "Suporte",
-  [JobTitle.Director]: "Diretor",
+  [JobTitle.SoftwareEngineer]: 'Engenheiro de Software',
+  [JobTitle.Developer]: 'Desenvolvedor',
+  [JobTitle.TechLead]: 'Tech Lead',
+  [JobTitle.ProductOwner]: 'Product Owner',
+  [JobTitle.ScrumMaster]: 'Scrum Master',
+  [JobTitle.Architect]: 'Arquiteto',
+  [JobTitle.HrAnalyst]: 'Analista de RH',
+  [JobTitle.Manager]: 'Gerente',
+  [JobTitle.DataEngineer]: 'Engenheiro de Dados',
+  [JobTitle.Support]: 'Suporte',
+  [JobTitle.Director]: 'Diretor',
 };
 
 export const departmentLabels: Record<Department, string> = {
-  [Department.IT]: "Tecnologia",
-  [Department.HR]: "RH",
-  [Department.Finance]: "Financeiro",
-  [Department.Marketing]: "Marketing",
-  [Department.Sales]: "Comercial",
-  [Department.Operations]: "Operações",
-  [Department.Legal]: "Jurídico",
-  [Department.Board]: "Diretoria",
+  [Department.IT]: 'Tecnologia',
+  [Department.HR]: 'RH',
+  [Department.Finance]: 'Financeiro',
+  [Department.Marketing]: 'Marketing',
+  [Department.Sales]: 'Comercial',
+  [Department.Operations]: 'Operações',
+  [Department.Legal]: 'Jurídico',
+  [Department.Board]: 'Diretoria',
 };
 
 export const requestTypeLabels: Record<RequestType, string> = {
-  [RequestType.MaternityLeave]: "Licença Maternidade",
-  [RequestType.DoctorsNote]: "Atestado Médico",
-  [RequestType.ForgotPunch]: "Esquecimento de Ponto",
-  [RequestType.Vacations]: "Férias",
+  [RequestType.MaternityLeave]: 'Licença Maternidade',
+  [RequestType.DoctorsNote]: 'Atestado Médico',
+  [RequestType.ForgotPunch]: 'Esquecimento de Ponto',
+  [RequestType.Vacations]: 'Férias',
 };
 
 export const requestStatusLabels: Record<RequestStatus, string> = {
-  [RequestStatus.Pending]: "Pendente",
-  [RequestStatus.Accepted]: "Aprovado",
-  [RequestStatus.Rejected]: "Rejeitado",
+  [RequestStatus.Pending]: 'Pendente',
+  [RequestStatus.Accepted]: 'Aprovado',
+  [RequestStatus.Rejected]: 'Rejeitado',
 };
 
 export const timeEntryTypeLabels: Record<TimeEntryType, string> = {
-  [TimeEntryType.Entry]: "Entrada",
-  [TimeEntryType.LaunchTime]: "Início Intervalo",
-  [TimeEntryType.ReturnToWork]: "Fim Intervalo",
-  [TimeEntryType.Exit]: "Saída",
+  [TimeEntryType.Entry]: 'Entrada',
+  [TimeEntryType.LaunchTime]: 'Início Intervalo',
+  [TimeEntryType.ReturnToWork]: 'Fim Intervalo',
+  [TimeEntryType.Exit]: 'Saída',
 };
 
 // ==================== INTERFACES ====================
@@ -165,8 +165,8 @@ export enum LocationType {
 }
 
 export const locationTypeLabels: Record<LocationType, string> = {
-  [LocationType.Office]: "Escritório",
-  [LocationType.Home]: "Home Office",
+  [LocationType.Office]: 'Escritório',
+  [LocationType.Home]: 'Home Office',
 };
 
 export interface Location {
@@ -271,14 +271,14 @@ export interface LoginResponse {
 
 // ==================== TOKEN MANAGEMENT ====================
 
-let authToken: string | null = localStorage.getItem("geopoint_token");
+let authToken: string | null = localStorage.getItem('geopoint_token');
 
 export const setAuthToken = (token: string | null) => {
   authToken = token;
   if (token) {
-    localStorage.setItem("geopoint_token", token);
+    localStorage.setItem('geopoint_token', token);
   } else {
-    localStorage.removeItem("geopoint_token");
+    localStorage.removeItem('geopoint_token');
   }
 };
 
@@ -286,16 +286,19 @@ export const getAuthToken = (): string | null => authToken;
 
 // ==================== API Helper ====================
 
-async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function apiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
 
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
 
   if (authToken) {
-    headers["Authorization"] = `Bearer ${authToken}`;
+    headers['Authorization'] = `Bearer ${authToken}`;
   }
 
   const config: RequestInit = {
@@ -320,8 +323,8 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
 
 export const authApi = {
   login: (email: string, password: string): Promise<LoginResponse> => {
-    return apiRequest<LoginResponse>("/api/Auth/login", {
-      method: "POST",
+    return apiRequest<LoginResponse>('/api/Auth/login', {
+      method: 'POST',
       body: JSON.stringify({ email, password }),
     });
   },
@@ -331,7 +334,7 @@ export const authApi = {
 
 export const usersApi = {
   getAll: (): Promise<User[]> => {
-    return apiRequest<User[]>("/api/Users");
+    return apiRequest<User[]>('/api/Users');
   },
 
   getById: (id: string): Promise<User> => {
@@ -339,8 +342,8 @@ export const usersApi = {
   },
 
   create: (data: UserCreate): Promise<User> => {
-    return apiRequest<User>("/api/Users", {
-      method: "POST",
+    return apiRequest<User>('/api/Users', {
+      method: 'POST',
       body: JSON.stringify(data),
     });
   },
@@ -350,7 +353,7 @@ export const usersApi = {
 
 export const workSchedulesApi = {
   getAll: (): Promise<WorkSchedule[]> => {
-    return apiRequest<WorkSchedule[]>("/api/WorkSchedules");
+    return apiRequest<WorkSchedule[]>('/api/WorkSchedules');
   },
 };
 
@@ -358,12 +361,12 @@ export const workSchedulesApi = {
 
 export const locationsApi = {
   getAll: (): Promise<Location[]> => {
-    return apiRequest<Location[]>("/api/Locations");
+    return apiRequest<Location[]>('/api/Locations');
   },
 
   create: (data: LocationCreate): Promise<Location> => {
-    return apiRequest<Location>("/api/Locations", {
-      method: "POST",
+    return apiRequest<Location>('/api/Locations', {
+      method: 'POST',
       body: JSON.stringify(data),
     });
   },
@@ -373,8 +376,8 @@ export const locationsApi = {
 
 export const timeEntriesApi = {
   create: (data: TimeEntryCreate): Promise<TimeEntry> => {
-    return apiRequest<TimeEntry>("/api/TimeEntries", {
-      method: "POST",
+    return apiRequest<TimeEntry>('/api/TimeEntries', {
+      method: 'POST',
       body: JSON.stringify(data),
     });
   },
@@ -389,19 +392,19 @@ export const timeEntriesApi = {
 export const requestsApi = {
   create: async (data: RequestCreate): Promise<ApiRequest> => {
     const formData = new FormData();
-    formData.append("RequesterId", data.requesterId);
-    formData.append("Type", String(data.type));
-    formData.append("TargetDate", data.targetDate);
-    if (data.justification) formData.append("Justification", data.justification);
+    formData.append('RequesterId', data.requesterId);
+    formData.append('Type', String(data.type));
+    formData.append('TargetDate', data.targetDate);
+    if (data.justification) formData.append('Justification', data.justification);
     if (data.attachments) {
-      data.attachments.forEach((file) => formData.append("Attachments", file));
+      data.attachments.forEach(file => formData.append('Attachments', file));
     }
 
     const headers: Record<string, string> = {};
-    if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
     const response = await fetch(`${API_BASE_URL}/api/Requests`, {
-      method: "POST",
+      method: 'POST',
       headers,
       body: formData,
     });
@@ -416,13 +419,13 @@ export const requestsApi = {
 
   review: (id: string, data: RequestReview): Promise<ApiRequest> => {
     return apiRequest<ApiRequest>(`/api/Requests/${id}/review`, {
-      method: "PUT",
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   },
 
   getPending: (): Promise<ApiRequest[]> => {
-    return apiRequest<ApiRequest[]>("/api/Requests/pending");
+    return apiRequest<ApiRequest[]>('/api/Requests/pending');
   },
 
   getById: (id: string): Promise<ApiRequest> => {
@@ -432,6 +435,19 @@ export const requestsApi = {
   getByUser: (userId: string): Promise<ApiRequest[]> => {
     return apiRequest<ApiRequest[]>(`/api/Requests/user/${userId}`);
   },
+
+  update: (id: string, data: { targetDate: string; justification?: string }): Promise<ApiRequest> => {
+    return apiRequest<ApiRequest>(`/api/Requests/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  delete: (id: string): Promise<void> => {
+    return apiRequest<void>(`/api/Requests/${id}`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 // ==================== ATTACHMENTS ====================
@@ -439,16 +455,16 @@ export const requestsApi = {
 export const attachmentsApi = {
   upload: async (file: File, requestId: string): Promise<Attachment> => {
     const formData = new FormData();
-    formData.append("File", file);
-    formData.append("RequestId", requestId);
+    formData.append('File', file);
+    formData.append('RequestId', requestId);
 
     const headers: Record<string, string> = {};
     if (authToken) {
-      headers["Authorization"] = `Bearer ${authToken}`;
+      headers['Authorization'] = `Bearer ${authToken}`;
     }
 
     const response = await fetch(`${API_BASE_URL}/api/Attachments`, {
-      method: "POST",
+      method: 'POST',
       headers,
       body: formData,
     });
@@ -474,7 +490,7 @@ export const reportsApi = {
   },
 
   getAuditLogs: (): Promise<AuditLog[]> => {
-    return apiRequest<AuditLog[]>("/api/Reports/audit-logs");
+    return apiRequest<AuditLog[]>('/api/Reports/audit-logs');
   },
 };
 
@@ -486,15 +502,15 @@ export const canReviewRequests = (jobTitle: JobTitle): boolean => {
 };
 
 /** Check if user should see the RH/Admin dashboard */
-export const getViewForJobTitle = (jobTitle: JobTitle): "admin" | "rh" | "employee" => {
-  if (jobTitle === JobTitle.Manager || jobTitle === JobTitle.Director) return "admin";
-  if (jobTitle === JobTitle.HrAnalyst) return "rh";
-  return "employee";
+export const getViewForJobTitle = (jobTitle: JobTitle): 'admin' | 'rh' | 'employee' => {
+  if (jobTitle === JobTitle.Manager || jobTitle === JobTitle.Director) return 'admin';
+  if (jobTitle === JobTitle.HrAnalyst) return 'rh';
+  return 'employee';
 };
 
 /** Parse time strings like "08:00:00" to hours */
 export const parseTimeToHours = (time: string): number => {
-  const parts = time.split(":");
+  const parts = time.split(':');
   if (parts.length >= 2) {
     return parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60;
   }

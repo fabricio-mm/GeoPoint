@@ -4,27 +4,27 @@
 
 @layer base {
   :root {
-    /* GeoPoint Design System - Light Blue Theme */
-    --background: 205 100% 96%;
-    --foreground: 220 30% 15%;
+    /* GeoPoint Design System - Professional Blue */
+    --background: 220 20% 97%;
+    --foreground: 222 47% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 30% 15%;
+    --card-foreground: 222 47% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 30% 15%;
+    --popover-foreground: 222 47% 14%;
 
-    --primary: 225 75% 60%;
+    --primary: 225 75% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 205 100% 96%;
-    --secondary-foreground: 225 75% 50%;
+    --secondary: 220 25% 94%;
+    --secondary-foreground: 225 60% 40%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 20% 45%;
+    --muted: 220 20% 94%;
+    --muted-foreground: 220 15% 46%;
 
-    --accent: 225 75% 95%;
-    --accent-foreground: 225 75% 45%;
+    --accent: 225 60% 94%;
+    --accent-foreground: 225 60% 40%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
@@ -35,15 +35,15 @@
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 225 75% 60%;
+    --border: 220 20% 90%;
+    --input: 220 20% 90%;
+    --ring: 225 75% 50%;
 
     --radius: 0.75rem;
 
     /* Custom GeoPoint tokens */
-    --geopoint-blue: 225 75% 60%;
-    --geopoint-blue-light: 225 75% 95%;
+    --geopoint-blue: 225 75% 50%;
+    --geopoint-blue-light: 225 60% 94%;
     --geopoint-olive: 60 30% 70%;
     --geopoint-olive-light: 60 30% 85%;
 
@@ -67,16 +67,16 @@
     --popover: 222 47% 14%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 225 75% 60%;
+    --primary: 225 75% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 33% 17%;
+    --secondary: 220 33% 17%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217 33% 17%;
+    --muted: 220 33% 17%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 217 33% 17%;
+    --accent: 220 33% 17%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 63% 31%;
@@ -85,11 +85,11 @@
     --warning: 48 60% 20%;
     --warning-foreground: 48 96% 89%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 225 75% 60%;
+    --border: 220 25% 20%;
+    --input: 220 25% 20%;
+    --ring: 225 75% 55%;
 
-    --geopoint-blue: 225 75% 60%;
+    --geopoint-blue: 225 75% 55%;
     --geopoint-blue-light: 225 40% 25%;
     --geopoint-olive: 60 30% 45%;
     --geopoint-olive-light: 60 20% 25%;
@@ -112,16 +112,21 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   }
 }
 
 @layer utilities {
   .geopoint-gradient {
-    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(225 75% 50%) 100%);
+    background: linear-gradient(160deg, hsl(225 80% 35%) 0%, hsl(225 75% 50%) 100%);
   }
   
   .card-shadow {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
+  }
+
+  .card-shadow-hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
   }
 
   .animate-pulse-slow {

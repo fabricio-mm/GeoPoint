@@ -4,12 +4,11 @@
   justify-content: space-between;
   padding: 0 1.5rem;
   height: 64px;
-  background: hsl(var(--card));
-  border-bottom: 1px solid hsl(var(--border));
+  background: linear-gradient(160deg, hsl(225 80% 35%) 0%, hsl(225 75% 50%) 100%);
   position: sticky;
   top: 0;
   z-index: 50;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 
 .header-left {
@@ -27,18 +26,18 @@
 .header-logo-icon {
   width: 28px;
   height: 28px;
-  color: hsl(var(--primary));
+  color: hsl(0 0% 100% / 0.9);
 }
 
 .header-logo-text {
   font-size: 1.25rem;
   font-weight: 700;
-  color: hsl(var(--primary));
+  color: white;
   letter-spacing: -0.025em;
 }
 
 .header-separator {
-  color: hsl(var(--border));
+  color: hsl(0 0% 100% / 0.3);
   font-weight: 300;
   margin: 0 0.25rem;
 }
@@ -46,7 +45,12 @@
 .header-user-name {
   font-size: 0.875rem;
   font-weight: 500;
-  color: hsl(var(--foreground));
+  color: hsl(0 0% 100% / 0.9);
+}
+
+.header-job-title {
+  font-size: 0.8rem;
+  color: hsl(0 0% 100% / 0.5);
 }
 
 .header-right {
@@ -64,24 +68,25 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.875rem;
-  background: hsl(var(--secondary));
-  border: 1px solid hsl(var(--border));
+  background: hsl(0 0% 100% / 0.12);
+  border: 1px solid hsl(0 0% 100% / 0.15);
   border-radius: var(--radius);
-  color: hsl(var(--foreground));
+  color: white;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
 }
 
 .header-dropdown-trigger:hover {
-  background: hsl(var(--primary) / 0.1);
-  border-color: hsl(var(--primary) / 0.3);
+  background: hsl(0 0% 100% / 0.2);
+  border-color: hsl(0 0% 100% / 0.3);
 }
 
 .header-dropdown-trigger.active {
-  background: hsl(var(--primary) / 0.1);
-  border-color: hsl(var(--primary));
+  background: hsl(0 0% 100% / 0.2);
+  border-color: hsl(0 0% 100% / 0.4);
 }
 
 .header-chevron {
@@ -100,7 +105,7 @@
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   z-index: 100;
   animation: dropdownFadeIn 0.15s ease-out;
   overflow: hidden;
@@ -147,10 +152,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.875rem;
-  background: transparent;
-  border: 1px solid hsl(var(--destructive) / 0.3);
+  background: hsl(0 0% 100% / 0.08);
+  border: 1px solid hsl(0 72% 60% / 0.4);
   border-radius: var(--radius);
-  color: hsl(var(--destructive));
+  color: hsl(0 100% 85%);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -158,8 +163,9 @@
 }
 
 .header-logout:hover {
-  background: hsl(var(--destructive) / 0.1);
-  border-color: hsl(var(--destructive));
+  background: hsl(0 72% 51% / 0.25);
+  border-color: hsl(0 72% 60%);
+  color: hsl(0 100% 90%);
 }
 
 .header-logout-icon {
@@ -189,7 +195,8 @@
   }
   
   .header-separator,
-  .header-user-name {
+  .header-user-name,
+  .header-job-title {
     display: none;
   }
   

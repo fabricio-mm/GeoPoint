@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin } from 'lucide-react';
+import { MapPin, Mail, Lock, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import './Login.css';
 
@@ -18,7 +18,6 @@ export default function Login() {
     setLoading(true);
 
     const result = await login(email, password);
-
     setLoading(false);
 
     if (result.success) {
@@ -32,7 +31,9 @@ export default function Login() {
     <div className="login-container">
       <div className="login-card">
         <div className="login-logo">
-          <MapPin className="login-logo-icon" strokeWidth={1.5} />
+          <div className="login-logo-badge">
+            <MapPin size={28} strokeWidth={1.5} />
+          </div>
           <h1 className="login-title">Geopoint</h1>
           <p className="login-subtitle">Sistema de Controle de Ponto por Geolocalização</p>
         </div>
@@ -41,36 +42,51 @@ export default function Login() {
           {error && <div className="login-error">{error}</div>}
 
           <div className="login-field">
-            <label className="login-label">Email</label>
-            <input
-              type="email"
-              className="login-input"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <label className="login-label" htmlFor="email">Email</label>
+            <div className="login-input-wrapper">
+              <Mail size={18} className="login-input-icon" />
+              <input
+                id="email"
+                type="email"
+                className="login-input"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
           </div>
 
           <div className="login-field">
-            <label className="login-label">Senha</label>
-            <input
-              type="password"
-              className="login-input"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <label className="login-label" htmlFor="password">Senha</label>
+            <div className="login-input-wrapper">
+              <Lock size={18} className="login-input-icon" />
+              <input
+                id="password"
+                type="password"
+                className="login-input"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
           </div>
 
           <button type="submit" className="login-button" disabled={loading}>
-            {loading ? 'Entrando...' : 'ENTRAR'}
+            {loading ? (
+              <>
+                <Loader2 size={18} className="login-spinner" />
+                Entrando...
+              </>
+            ) : (
+              'Entrar'
+            )}
           </button>
         </form>
 
         <div className="login-forgot">
-          <a href="#">Esqueceu sua senha?</a>
+          <a href="#" className="login-forgot-link">Esqueceu sua senha?</a>
         </div>
       </div>
     </div>

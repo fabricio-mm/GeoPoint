@@ -20,20 +20,28 @@
   padding: 0.625rem 1.5rem;
   border: none;
   border-radius: 9999px;
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
+  background: linear-gradient(160deg, hsl(225 80% 35%) 0%, hsl(225 75% 50%) 100%);
+  color: white;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 2px 8px hsl(225 75% 45% / 0.3);
 }
 
 .admin-tab:hover {
-  background: hsl(225 75% 55%);
+  opacity: 0.92;
 }
 
 .admin-tab.secondary {
-  background: hsl(var(--primary));
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.admin-tab.secondary:hover {
+  color: hsl(var(--foreground));
+  background: hsl(var(--secondary));
 }
 
 /* Stats Cards */
@@ -47,9 +55,10 @@
 .stat-card {
   background: hsl(var(--card));
   border-radius: var(--radius);
-  padding: 1rem 1.25rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
   animation: fadeIn 0.3s ease-out;
+  border: 1px solid hsl(var(--border));
 }
 
 .stat-card-title {
@@ -70,7 +79,8 @@
   background: hsl(var(--card));
   border-radius: var(--radius);
   padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
+  border: 1px solid hsl(var(--border));
 }
 
 .records-header {

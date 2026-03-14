@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Clock, History, List, MapPin, Check, Briefcase, Timer, AlertCircle, CalendarDays, FileText, CheckCircle2, XCircle, Plus, LogIn, LogOut, Coffee, UtensilsCrossed } from 'lucide-react';
+import { Clock, History, List, MapPin, Check, Briefcase, Timer, AlertCircle, CalendarDays, FileText, CheckCircle2, XCircle, Plus, LogIn, LogOut, Coffee, UtensilsCrossed, Settings, Eye, EyeOff, Lock } from 'lucide-react';
 import Header from '@/components/Header/Header';
 import HistoryCalendar, { CalendarRecord } from '@/components/HistoryCalendar/HistoryCalendar';
 import NewRequestModal, { DisplayRequest } from '@/components/NewRequestModal/NewRequestModal';
@@ -9,6 +9,7 @@ import {
   timeEntriesApi,
   requestsApi,
   workSchedulesApi,
+  usersApi,
   TimeEntry,
   TimeEntryType,
   TimeEntryOrigin,
@@ -23,7 +24,7 @@ import {
 import { toast } from 'sonner';
 import './EmployeeDashboard.css';
 
-type TabType = 'ponto' | 'historico' | 'solicitacoes';
+type TabType = 'ponto' | 'historico' | 'solicitacoes' | 'conta';
 type PeriodFilter = 'day' | 'week' | 'month';
 
 // UI clock step — the 4-step daily flow matching TimeEntryType
@@ -277,10 +278,43 @@ export default function EmployeeDashboard() {
   const scheduleTolerance = schedule?.toleranceMinutes || 15;
   const scheduleName = schedule?.name || 'Horário Comercial';
 
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [showPasswords, setShowPasswords] = useState({ current: false, new: false, confirm: false });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!user) return;
+    if (!passwordForm.newPassword || !passwordForm.confirmPassword) {
+      toast.error('Preencha todos os campos');
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      toast.error('A nova senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('As senhas não coincidem');
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      await usersApi.update(user.id, { password: passwordForm.newPassword });
+      toast.success('Senha alterada com sucesso');
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err: any) {
+      console.error(err);
+      let msg = 'Erro ao alterar senha';
+      try { msg = JSON.parse(err.message)?.message || msg; } catch {}
+      toast.error(msg);
+    }
+    setIsChangingPassword(false);
+  };
+
   const tabs = [
     { id: 'ponto' as TabType, label: 'Ponto', icon: Clock },
     { id: 'historico' as TabType, label: 'Histórico', icon: History },
     { id: 'solicitacoes' as TabType, label: 'Solicitações', icon: List },
+    { id: 'conta' as TabType, label: 'Minha Conta', icon: Settings },
   ];
 
   return (
@@ -559,6 +593,71 @@ export default function EmployeeDashboard() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'conta' && (
+          <div className="account-section">
+            <div className="section-header">
+              <h2 className="section-title">Minha Conta</h2>
+            </div>
+
+            <div className="account-card">
+              <div className="account-card-header">
+                <Lock size={20} />
+                <h3>Alterar Senha</h3>
+              </div>
+
+              <div className="account-form">
+                <div className="account-field">
+                  <label className="account-label">Nova Senha</label>
+                  <div className="account-input-wrapper">
+                    <input
+                      type={showPasswords.new ? 'text' : 'password'}
+                      className="account-input"
+                      placeholder="Digite a nova senha"
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      className="account-eye-btn"
+                      onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                    >
+                      {showPasswords.new ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="account-field">
+                  <label className="account-label">Confirmar Nova Senha</label>
+                  <div className="account-input-wrapper">
+                    <input
+                      type={showPasswords.confirm ? 'text' : 'password'}
+                      className="account-input"
+                      placeholder="Confirme a nova senha"
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      className="account-eye-btn"
+                      onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                    >
+                      {showPasswords.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  className="account-save-btn"
+                  onClick={handleChangePassword}
+                  disabled={isChangingPassword}
+                >
+                  {isChangingPassword ? 'Salvando...' : 'Alterar Senha'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>

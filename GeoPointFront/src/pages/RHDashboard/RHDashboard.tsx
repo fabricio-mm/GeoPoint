@@ -1,17 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Filter, X, User, FileText, CalendarDays, Clock, CheckCircle2, XCircle, AlertCircle, Baby, Stethoscope } from 'lucide-react';
+import { Calendar, Filter, X, User, FileText, CalendarDays, Clock, CheckCircle2, XCircle, AlertCircle, Baby, Stethoscope, UserPlus, Eye, EyeOff } from 'lucide-react';
 import Header from '@/components/Header/Header';
 import {
   requestsApi,
   usersApi,
+  workSchedulesApi,
   ApiRequest,
   User as ApiUser,
+  UserCreate,
+  WorkSchedule,
   RequestType,
   RequestStatus,
+  UserRole,
+  Department,
+  JobTitle,
   requestTypeLabels,
   requestStatusLabels,
+  userRoleLabels,
+  departmentLabels,
+  jobTitleLabels,
   canReviewRequests,
-  JobTitle,
 } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -25,6 +33,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import './RHDashboard.css';
 
@@ -59,6 +68,7 @@ export default function RHDashboard() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [rejectComment, setRejectComment] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'requests' | 'register'>('requests');
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -66,6 +76,20 @@ export default function RHDashboard() {
   const [modalLoading, setModalLoading] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
+
+  // Register form state
+  const [workSchedules, setWorkSchedules] = useState<WorkSchedule[]>([]);
+  const [registerForm, setRegisterForm] = useState<UserCreate>({
+    fullName: '',
+    email: '',
+    password: '',
+    role: UserRole.Employee,
+    workScheduleId: 0,
+    department: Department.IT,
+    jobTitle: JobTitle.SoftwareEngineer,
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -98,6 +122,44 @@ export default function RHDashboard() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    workSchedulesApi.getAll().then(setWorkSchedules).catch(() => {});
+  }, []);
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!registerForm.fullName.trim() || !registerForm.email.trim() || !registerForm.password.trim()) {
+      toast.error('Preencha todos os campos obrigatórios');
+      return;
+    }
+    if (registerForm.password.length < 6) {
+      toast.error('A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+    setIsRegistering(true);
+    try {
+      await usersApi.create(registerForm);
+      toast.success('Funcionário cadastrado com sucesso!');
+      setRegisterForm({
+        fullName: '',
+        email: '',
+        password: '',
+        role: UserRole.Employee,
+        workScheduleId: 0,
+        department: Department.IT,
+        jobTitle: JobTitle.SoftwareEngineer,
+      });
+      loadData();
+    } catch (err: any) {
+      let msg = 'Erro ao cadastrar funcionário';
+      try { const p = JSON.parse(err.message); if (p.message) msg = p.message; } catch {
+        if (err.message && !err.message.startsWith('HTTP')) msg = err.message;
+      }
+      toast.error(msg);
+    }
+    setIsRegistering(false);
+  };
 
   const pendingCount = requests.filter(r => r.status === RequestStatus.Pending).length;
 
@@ -186,108 +248,250 @@ export default function RHDashboard() {
       <Header />
       <main className="rh-content">
         <div className="rh-tabs">
-          <button className="rh-tab">
+          <button
+            className={`rh-tab ${activeTab === 'requests' ? '' : 'rh-tab-inactive'}`}
+            onClick={() => setActiveTab('requests')}
+          >
             Solicitações recebidas
             {pendingCount > 0 && (
               <span className="rh-tab-badge">{pendingCount}</span>
             )}
           </button>
+          <button
+            className={`rh-tab ${activeTab === 'register' ? '' : 'rh-tab-inactive'}`}
+            onClick={() => setActiveTab('register')}
+          >
+            <UserPlus size={16} />
+            Cadastrar Funcionário
+          </button>
         </div>
 
-        <div className="rh-requests-card">
-          <h2 className="rh-requests-title">Solicitações de funcionários</h2>
+        {activeTab === 'requests' && (
+          <div className="rh-requests-card">
+            <h2 className="rh-requests-title">Solicitações de funcionários</h2>
 
-          <div className="rh-filters">
-            <button className="rh-filter-button">
-              <Calendar size={16} />
-              Data
-              <Filter size={14} />
-            </button>
-            <select
-              className="rh-filter-select"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">Status</option>
-              <option value="pending">Pendente</option>
-              <option value="approved">Aprovado</option>
-              <option value="rejected">Rejeitado</option>
-            </select>
-          </div>
-
-          {isLoading ? (
-            <div className="rh-requests-empty">Carregando...</div>
-          ) : filteredRequests.length === 0 ? (
-            <div className="rh-requests-empty">Nenhuma solicitação encontrada</div>
-          ) : (
-            <div className="rh-requests-list">
-              {filteredRequests.map((request, index) => {
-                const status = statusCssClass(request.status);
-                return (
-                  <div
-                    key={request.id}
-                    className={`rh-request-card ${status}`}
-                    style={{ animationDelay: `${index * 0.05}s`, cursor: 'pointer' }}
-                    onClick={() => openReviewModal(request.id)}
-                  >
-                    <div className="rh-request-card-left">
-                      <div className={`rh-request-type-badge ${status}`}>
-                        {requestTypeIcons[request.type] || <FileText size={14} />}
-                      </div>
-                    </div>
-
-                    <div className="rh-request-card-content">
-                      <div className="rh-request-card-header">
-                        <div className="rh-request-card-info">
-                          <h4 className="rh-request-employee">{request.userName}</h4>
-                          <span className="rh-request-type">{requestTypeLabels[request.type]}</span>
-                        </div>
-                        <span className={`rh-request-badge ${status}`}>
-                          {status === 'pending' && <Clock size={12} />}
-                          {status === 'approved' && <CheckCircle2 size={12} />}
-                          {status === 'rejected' && <XCircle size={12} />}
-                          {requestStatusLabels[request.status]}
-                        </span>
-                      </div>
-
-                      <p className="rh-request-description">{request.description}</p>
-
-                      <div className="rh-request-meta">
-                        {request.targetDate && (
-                          <div className="rh-request-date-item">
-                            <CalendarDays size={14} />
-                            <span>Referência: <strong>{formatDate(request.targetDate)}</strong></span>
-                          </div>
-                        )}
-                        <div className="rh-request-date-item">
-                          <Clock size={14} />
-                          <span>Solicitado: <strong>{formatDate(request.createdAt)}</strong></span>
-                        </div>
-                        {request.containsProof && (
-                          <span className="rh-request-proof">📎 Contém comprovante</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {status === 'pending' && (
-                      <div className="rh-request-card-action">
-                        <button
-                          className="rh-analyze-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openReviewModal(request.id);
-                          }}
-                        >
-                          Analisar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="rh-filters">
+              <button className="rh-filter-button">
+                <Calendar size={16} />
+                Data
+                <Filter size={14} />
+              </button>
+              <select
+                className="rh-filter-select"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="all">Status</option>
+                <option value="pending">Pendente</option>
+                <option value="approved">Aprovado</option>
+                <option value="rejected">Rejeitado</option>
+              </select>
             </div>
-          )}
-        </div>
+
+            {isLoading ? (
+              <div className="rh-requests-empty">Carregando...</div>
+            ) : filteredRequests.length === 0 ? (
+              <div className="rh-requests-empty">Nenhuma solicitação encontrada</div>
+            ) : (
+              <div className="rh-requests-list">
+                {filteredRequests.map((request, index) => {
+                  const status = statusCssClass(request.status);
+                  return (
+                    <div
+                      key={request.id}
+                      className={`rh-request-card ${status}`}
+                      style={{ animationDelay: `${index * 0.05}s`, cursor: 'pointer' }}
+                      onClick={() => openReviewModal(request.id)}
+                    >
+                      <div className="rh-request-card-left">
+                        <div className={`rh-request-type-badge ${status}`}>
+                          {requestTypeIcons[request.type] || <FileText size={14} />}
+                        </div>
+                      </div>
+
+                      <div className="rh-request-card-content">
+                        <div className="rh-request-card-header">
+                          <div className="rh-request-card-info">
+                            <h4 className="rh-request-employee">{request.userName}</h4>
+                            <span className="rh-request-type">{requestTypeLabels[request.type]}</span>
+                          </div>
+                          <span className={`rh-request-badge ${status}`}>
+                            {status === 'pending' && <Clock size={12} />}
+                            {status === 'approved' && <CheckCircle2 size={12} />}
+                            {status === 'rejected' && <XCircle size={12} />}
+                            {requestStatusLabels[request.status]}
+                          </span>
+                        </div>
+
+                        <p className="rh-request-description">{request.description}</p>
+
+                        <div className="rh-request-meta">
+                          {request.targetDate && (
+                            <div className="rh-request-date-item">
+                              <CalendarDays size={14} />
+                              <span>Referência: <strong>{formatDate(request.targetDate)}</strong></span>
+                            </div>
+                          )}
+                          <div className="rh-request-date-item">
+                            <Clock size={14} />
+                            <span>Solicitado: <strong>{formatDate(request.createdAt)}</strong></span>
+                          </div>
+                          {request.containsProof && (
+                            <span className="rh-request-proof">📎 Contém comprovante</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {status === 'pending' && (
+                        <div className="rh-request-card-action">
+                          <button
+                            className="rh-analyze-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openReviewModal(request.id);
+                            }}
+                          >
+                            Analisar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'register' && (
+          <div className="rh-requests-card">
+            <h2 className="rh-requests-title">Cadastrar novo funcionário</h2>
+
+            <form className="rh-register-form" onSubmit={handleRegister}>
+              <div className="rh-register-row">
+                <div className="rh-register-field">
+                  <Label htmlFor="reg-name">Nome Completo *</Label>
+                  <Input
+                    id="reg-name"
+                    placeholder="Ex: João da Silva"
+                    value={registerForm.fullName}
+                    onChange={(e) => setRegisterForm(f => ({ ...f, fullName: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="rh-register-field">
+                  <Label htmlFor="reg-email">E-mail *</Label>
+                  <Input
+                    id="reg-email"
+                    type="email"
+                    placeholder="joao@empresa.com"
+                    value={registerForm.email}
+                    onChange={(e) => setRegisterForm(f => ({ ...f, email: e.target.value }))}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="rh-register-row">
+                <div className="rh-register-field">
+                  <Label htmlFor="reg-password">Senha *</Label>
+                  <div className="rh-register-password-wrapper">
+                    <Input
+                      id="reg-password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Mínimo 6 caracteres"
+                      value={registerForm.password}
+                      onChange={(e) => setRegisterForm(f => ({ ...f, password: e.target.value }))}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="rh-register-eye-btn"
+                      onClick={() => setShowPassword(v => !v)}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+                <div className="rh-register-field">
+                  <Label htmlFor="reg-role">Vínculo</Label>
+                  <select
+                    id="reg-role"
+                    className="rh-filter-select rh-register-select"
+                    value={registerForm.role}
+                    onChange={(e) => setRegisterForm(f => ({ ...f, role: Number(e.target.value) }))}
+                  >
+                    {Object.entries(userRoleLabels).map(([val, label]) => (
+                      <option key={val} value={val}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="rh-register-row">
+                <div className="rh-register-field">
+                  <Label htmlFor="reg-dept">Departamento</Label>
+                  <select
+                    id="reg-dept"
+                    className="rh-filter-select rh-register-select"
+                    value={registerForm.department}
+                    onChange={(e) => setRegisterForm(f => ({ ...f, department: Number(e.target.value) }))}
+                  >
+                    {Object.entries(departmentLabels).map(([val, label]) => (
+                      <option key={val} value={val}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="rh-register-field">
+                  <Label htmlFor="reg-jobtitle">Cargo</Label>
+                  <select
+                    id="reg-jobtitle"
+                    className="rh-filter-select rh-register-select"
+                    value={registerForm.jobTitle}
+                    onChange={(e) => setRegisterForm(f => ({ ...f, jobTitle: Number(e.target.value) }))}
+                  >
+                    {Object.entries(jobTitleLabels).map(([val, label]) => (
+                      <option key={val} value={val}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="rh-register-row">
+                <div className="rh-register-field">
+                  <Label htmlFor="reg-schedule">Jornada de Trabalho</Label>
+                  <select
+                    id="reg-schedule"
+                    className="rh-filter-select rh-register-select"
+                    value={registerForm.workScheduleId}
+                    onChange={(e) => setRegisterForm(f => ({ ...f, workScheduleId: Number(e.target.value) }))}
+                  >
+                    {workSchedules.length > 0 ? (
+                      workSchedules.map(ws => (
+                        <option key={ws.id} value={ws.id}>
+                          {ws.name} ({ws.startTime.slice(0, 5)} - {ws.endTime.slice(0, 5)})
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value={0}>Comercial (08:00 - 17:00)</option>
+                        <option value={1}>Estágio (08:00 - 15:00)</option>
+                        <option value={2}>Terceirizado (09:00 - 18:00)</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              <div className="rh-register-actions">
+                <Button type="submit" disabled={isRegistering} className="rh-register-submit">
+                  <UserPlus size={16} />
+                  {isRegistering ? 'Cadastrando...' : 'Cadastrar Funcionário'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        )}
       </main>
 
       {/* Review Modal using Dialog */}

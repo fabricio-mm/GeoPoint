@@ -347,6 +347,13 @@ export const usersApi = {
       body: JSON.stringify(data),
     });
   },
+
+  update: (id: string, data: Partial<UserCreate>): Promise<User> => {
+    return apiRequest<User>(`/api/Users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
 };
 
 // ==================== WORK SCHEDULES ====================

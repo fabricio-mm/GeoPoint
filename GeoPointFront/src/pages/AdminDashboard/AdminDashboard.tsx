@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Header from '@/components/Header/Header';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   usersApi,
   workSchedulesApi,
@@ -53,6 +54,7 @@ const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const WEEKDAYS_FULL = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('apontamentos');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState('all');
@@ -84,22 +86,28 @@ export default function AdminDashboard() {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [usersData, schedulesData, locationsData] = await Promise.all([
+      const [allUsersData, schedulesData, locationsData] = await Promise.all([
         usersApi.getAll(),
         workSchedulesApi.getAll(),
         locationsApi.getAll(),
       ]);
+
+      // Filter users by department if logged-in user is Manager/Director
+      const usersData = user
+        ? allUsersData.filter(u => u.department === user.department)
+        : allUsersData;
+
       setUsers(usersData);
       setWorkSchedules(schedulesData);
       setAllLocations(locationsData);
 
       const allEntries: TimeEntry[] = [];
-      for (const user of usersData) {
+      for (const u of usersData) {
         try {
-          const entries = await timeEntriesApi.getByUser(user.id);
+          const entries = await timeEntriesApi.getByUser(u.id);
           allEntries.push(...entries);
         } catch (err) {
-          console.error(`Error loading entries for user ${user.id}:`, err);
+          console.error(`Error loading entries for user ${u.id}:`, err);
         }
       }
       setTimeEntries(allEntries);
@@ -108,7 +116,7 @@ export default function AdminDashboard() {
       toast.error('Erro ao carregar dados');
     }
     setIsLoading(false);
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadData();

@@ -1,31 +1,139 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://localhost:7145';
 
-// ==================== TYPES ====================
+// ==================== ENUMS ====================
 
-export type UserRole = 'EMPLOYEE' | 'HR' | 'ADMIN';
-export type UserStatus = 'ACTIVE' | 'INACTIVE';
-export type LocationType = 'OFFICE' | 'HOME';
-export type TimeEntryType = 1 | 2;
-export type TimeEntryOrigin = 1 | 2; // 1=WEB, 2=MOBILE
-export type RequestType = 1 | 2 | 3; // 1=FORGOT_PUNCH, 2=CERTIFICATE, 3=VACATION
-export type RequestStatus = 0 | 1 | 2; // 0=PENDING, 1=APPROVED, 2=REJECTED
+export enum TimeEntryOrigin {
+  Web = 1,
+  Office = 2,
+}
+
+export enum TimeEntryType {
+  Entry = 0,
+  LaunchTime = 1,
+  ReturnToWork = 2,
+  Exit = 3,
+}
+
+export enum UserRole {
+  Intern = 0,
+  Employee = 1,
+  Trainee = 2,
+  Contractor = 3,
+}
+
+export enum WorkScheduleType {
+  Comercial = 0,
+  Intern = 1,
+  Contractor = 2,
+}
+
+export enum JobTitle {
+  SoftwareEngineer = 0,
+  Developer = 1,
+  TechLead = 2,
+  ProductOwner = 3,
+  ScrumMaster = 4,
+  Architect = 5,
+  HrAnalyst = 6,
+  Manager = 7,
+  DataEngineer = 8,
+  Support = 9,
+  Director = 10,
+}
+
+export enum Department {
+  IT = 0,
+  HR = 1,
+  Finance = 2,
+  Marketing = 3,
+  Sales = 4,
+  Operations = 5,
+  Legal = 6,
+  Board = 7,
+}
+
+export enum UserStatus {
+  Inactive = 0,
+  Active = 1,
+}
+
+export enum RequestType {
+  MaternityLeave = 0,
+  DoctorsNote = 1,
+  ForgotPunch = 2,
+  Vacations = 3,
+}
+
+export enum RequestStatus {
+  Pending = 1,
+  Accepted = 2,
+  Rejected = 3,
+}
+
+// ==================== LABELS ====================
+
+export const userRoleLabels: Record<UserRole, string> = {
+  [UserRole.Intern]: 'Estagiário',
+  [UserRole.Employee]: 'Funcionário',
+  [UserRole.Trainee]: 'Trainee',
+  [UserRole.Contractor]: 'Terceirizado',
+};
+
+export const jobTitleLabels: Record<JobTitle, string> = {
+  [JobTitle.SoftwareEngineer]: 'Engenheiro de Software',
+  [JobTitle.Developer]: 'Desenvolvedor',
+  [JobTitle.TechLead]: 'Tech Lead',
+  [JobTitle.ProductOwner]: 'Product Owner',
+  [JobTitle.ScrumMaster]: 'Scrum Master',
+  [JobTitle.Architect]: 'Arquiteto',
+  [JobTitle.HrAnalyst]: 'Analista de RH',
+  [JobTitle.Manager]: 'Gerente',
+  [JobTitle.DataEngineer]: 'Engenheiro de Dados',
+  [JobTitle.Support]: 'Suporte',
+  [JobTitle.Director]: 'Diretor',
+};
+
+export const departmentLabels: Record<Department, string> = {
+  [Department.IT]: 'Tecnologia',
+  [Department.HR]: 'RH',
+  [Department.Finance]: 'Financeiro',
+  [Department.Marketing]: 'Marketing',
+  [Department.Sales]: 'Comercial',
+  [Department.Operations]: 'Operações',
+  [Department.Legal]: 'Jurídico',
+  [Department.Board]: 'Diretoria',
+};
+
+export const requestTypeLabels: Record<RequestType, string> = {
+  [RequestType.MaternityLeave]: 'Licença Maternidade',
+  [RequestType.DoctorsNote]: 'Atestado Médico',
+  [RequestType.ForgotPunch]: 'Esquecimento de Ponto',
+  [RequestType.Vacations]: 'Férias',
+};
+
+export const requestStatusLabels: Record<RequestStatus, string> = {
+  [RequestStatus.Pending]: 'Pendente',
+  [RequestStatus.Accepted]: 'Aprovado',
+  [RequestStatus.Rejected]: 'Rejeitado',
+};
+
+export const timeEntryTypeLabels: Record<TimeEntryType, string> = {
+  [TimeEntryType.Entry]: 'Entrada',
+  [TimeEntryType.LaunchTime]: 'Início Intervalo',
+  [TimeEntryType.ReturnToWork]: 'Fim Intervalo',
+  [TimeEntryType.Exit]: 'Saída',
+};
 
 // ==================== INTERFACES ====================
 
 export interface WorkSchedule {
-  id: string;
+  id: number;
   name: string;
-  dailyHoursTarget: string;
+  startTime: string;
+  endTime: string;
   toleranceMinutes: number;
   workDays: number[];
   users?: User[];
-}
-
-export interface WorkScheduleCreate {
-  name: string;
-  dailyHoursTarget: string;
-  toleranceMinutes: number;
-  workDays: number[];
 }
 
 export interface User {
@@ -33,17 +141,39 @@ export interface User {
   fullName: string;
   email: string;
   role: UserRole;
+  department: Department;
+  jobTitle: JobTitle;
   status: UserStatus;
-  workScheduleId?: string;
+  workScheduleId?: number;
   workSchedule?: WorkSchedule;
   locations?: Location[];
 }
+
+export interface UserCreate {
+  fullName: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  workScheduleId: number;
+  department: Department;
+  jobTitle: JobTitle;
+}
+
+export enum LocationType {
+  Office = 1,
+  Home = 2,
+}
+
+export const locationTypeLabels: Record<LocationType, string> = {
+  [LocationType.Office]: 'Escritório',
+  [LocationType.Home]: 'Home Office',
+};
 
 export interface Location {
   id: string;
   userId?: string;
   name: string;
-  type: LocationType;
+  type: number;
   latitude: number;
   longitude: number;
   radiusMeters: number;
@@ -53,7 +183,7 @@ export interface Location {
 export interface LocationCreate {
   userId?: string;
   name: string;
-  type: LocationType;
+  type: number;
   latitude: number;
   longitude: number;
   radiusMeters: number;
@@ -79,7 +209,7 @@ export interface TimeEntryCreate {
   longitude: number;
 }
 
-export interface Request {
+export interface ApiRequest {
   id: string;
   requesterId: string;
   reviewerId?: string;
@@ -97,14 +227,15 @@ export interface Request {
 export interface RequestCreate {
   requesterId: string;
   type: RequestType;
-  targetDate?: string;
-  justification: string;
-  containsProof?: boolean;
+  targetDate: string;
+  justification?: string;
+  attachments?: File[];
 }
 
 export interface RequestReview {
   reviewerId: string;
-  newStatus: 1 | 2; // 1=APPROVED, 2=REJECTED
+  newStatus: RequestStatus.Accepted | RequestStatus.Rejected;
+  comment?: string;
 }
 
 export interface Attachment {
@@ -133,10 +264,25 @@ export interface AuditLog {
   entityAffected: string;
 }
 
-export interface AuditLogFilters {
-  userId?: string;
-  entity?: string;
+export interface LoginResponse {
+  token: string;
+  user: User;
 }
+
+// ==================== TOKEN MANAGEMENT ====================
+
+let authToken: string | null = localStorage.getItem('geopoint_token');
+
+export const setAuthToken = (token: string | null) => {
+  authToken = token;
+  if (token) {
+    localStorage.setItem('geopoint_token', token);
+  } else {
+    localStorage.removeItem('geopoint_token');
+  }
+};
+
+export const getAuthToken = (): string | null => authToken;
 
 // ==================== API Helper ====================
 
@@ -146,12 +292,18 @@ async function apiRequest<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+
   const config: RequestInit = {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
   };
 
   const response = await fetch(url, config);
@@ -167,6 +319,17 @@ async function apiRequest<T>(
   return JSON.parse(text);
 }
 
+// ==================== AUTH ====================
+
+export const authApi = {
+  login: (email: string, password: string): Promise<LoginResponse> => {
+    return apiRequest<LoginResponse>('/api/Auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  },
+};
+
 // ==================== USERS ====================
 
 export const usersApi = {
@@ -177,6 +340,20 @@ export const usersApi = {
   getById: (id: string): Promise<User> => {
     return apiRequest<User>(`/api/Users/${id}`);
   },
+
+  create: (data: UserCreate): Promise<User> => {
+    return apiRequest<User>('/api/Users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  update: (id: string, data: Partial<UserCreate>): Promise<User> => {
+    return apiRequest<User>(`/api/Users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
 };
 
 // ==================== WORK SCHEDULES ====================
@@ -184,13 +361,6 @@ export const usersApi = {
 export const workSchedulesApi = {
   getAll: (): Promise<WorkSchedule[]> => {
     return apiRequest<WorkSchedule[]>('/api/WorkSchedules');
-  },
-
-  create: (data: WorkScheduleCreate): Promise<WorkSchedule> => {
-    return apiRequest<WorkSchedule>('/api/WorkSchedules', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
   },
 };
 
@@ -227,30 +397,63 @@ export const timeEntriesApi = {
 // ==================== REQUESTS ====================
 
 export const requestsApi = {
-  create: (data: RequestCreate): Promise<Request> => {
-    return apiRequest<Request>('/api/Requests', {
+  create: async (data: RequestCreate): Promise<ApiRequest> => {
+    const formData = new FormData();
+    formData.append('RequesterId', data.requesterId);
+    formData.append('Type', String(data.type));
+    formData.append('TargetDate', data.targetDate);
+    if (data.justification) formData.append('Justification', data.justification);
+    if (data.attachments) {
+      data.attachments.forEach(file => formData.append('Attachments', file));
+    }
+
+    const headers: Record<string, string> = {};
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+    const response = await fetch(`${API_BASE_URL}/api/Requests`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      headers,
+      body: formData,
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
   },
 
-  review: (id: string, data: RequestReview): Promise<Request> => {
-    return apiRequest<Request>(`/api/Requests/${id}/review`, {
+  review: (id: string, data: RequestReview): Promise<ApiRequest> => {
+    return apiRequest<ApiRequest>(`/api/Requests/${id}/review`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   },
 
-  getPending: (): Promise<Request[]> => {
-    return apiRequest<Request[]>('/api/Requests/pending');
+  getPending: (): Promise<ApiRequest[]> => {
+    return apiRequest<ApiRequest[]>('/api/Requests/pending');
   },
 
-  getById: (id: string): Promise<Request> => {
-    return apiRequest<Request>(`/api/Requests/${id}`);
+  getById: (id: string): Promise<ApiRequest> => {
+    return apiRequest<ApiRequest>(`/api/Requests/${id}`);
   },
 
-  getByUser: (userId: string): Promise<Request[]> => {
-    return apiRequest<Request[]>(`/api/Requests/user/${userId}`);
+  getByUser: (userId: string): Promise<ApiRequest[]> => {
+    return apiRequest<ApiRequest[]>(`/api/Requests/user/${userId}`);
+  },
+
+  update: (id: string, data: { targetDate: string; justification?: string }): Promise<ApiRequest> => {
+    return apiRequest<ApiRequest>(`/api/Requests/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  delete: (id: string): Promise<void> => {
+    return apiRequest<void>(`/api/Requests/${id}`, {
+      method: 'DELETE',
+    });
   },
 };
 
@@ -262,8 +465,14 @@ export const attachmentsApi = {
     formData.append('File', file);
     formData.append('RequestId', requestId);
 
+    const headers: Record<string, string> = {};
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/Attachments`, {
       method: 'POST',
+      headers,
       body: formData,
     });
 
@@ -292,36 +501,39 @@ export const reportsApi = {
   },
 };
 
-// ==================== AUDIT LOGS ====================
-
-export const auditLogsApi = {
-  getAll: (filters?: AuditLogFilters): Promise<AuditLog[]> => {
-    const params = new URLSearchParams();
-    if (filters?.userId) params.append('userId', filters.userId);
-    if (filters?.entity) params.append('entity', filters.entity);
-
-    const queryString = params.toString();
-    const endpoint = queryString ? `/api/AuditLogs?${queryString}` : '/api/AuditLogs';
-
-    return apiRequest<AuditLog[]>(endpoint);
-  },
-};
-
 // ==================== HELPER FUNCTIONS ====================
 
-// Parse dailyHoursTarget from "HH:MM:SS" to hours number
-export const parseHoursTarget = (target: string): number => {
-  const parts = target.split(':');
-  if (parts.length >= 2) {
-    const hours = parseInt(parts[0], 10);
-    const minutes = parseInt(parts[1], 10);
-    return hours + (minutes / 60);
-  }
-  return 8;
+/** Check if a JobTitle can review requests (Manager or HrAnalyst) */
+export const canReviewRequests = (jobTitle: JobTitle): boolean => {
+  return jobTitle === JobTitle.Manager || jobTitle === JobTitle.HrAnalyst;
 };
 
-// Export all APIs as a single object for convenience
+/** Check if user should see the RH/Admin dashboard */
+export const getViewForJobTitle = (jobTitle: JobTitle): 'admin' | 'rh' | 'employee' => {
+  if (jobTitle === JobTitle.Manager || jobTitle === JobTitle.Director) return 'admin';
+  if (jobTitle === JobTitle.HrAnalyst) return 'rh';
+  return 'employee';
+};
+
+/** Parse time strings like "08:00:00" to hours */
+export const parseTimeToHours = (time: string): number => {
+  const parts = time.split(':');
+  if (parts.length >= 2) {
+    return parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60;
+  }
+  return 0;
+};
+
+/** Calculate daily hours from startTime and endTime (minus 1h lunch) */
+export const calcScheduleHours = (schedule: WorkSchedule): number => {
+  const start = parseTimeToHours(schedule.startTime);
+  const end = parseTimeToHours(schedule.endTime);
+  return end - start - 1; // subtract 1h lunch
+};
+
+// Export all APIs
 export const api = {
+  auth: authApi,
   users: usersApi,
   workSchedules: workSchedulesApi,
   locations: locationsApi,
@@ -329,7 +541,6 @@ export const api = {
   requests: requestsApi,
   attachments: attachmentsApi,
   reports: reportsApi,
-  auditLogs: auditLogsApi,
 };
 
 export default api;

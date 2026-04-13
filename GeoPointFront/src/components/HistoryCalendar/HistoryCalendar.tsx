@@ -1,22 +1,24 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Clock, XCircle } from 'lucide-react';
-import { TimeRecord, TimeRecordType } from '@/types';
+import { TimeEntryType, timeEntryTypeLabels } from '@/services/api';
 import './HistoryCalendar.css';
 
+export interface CalendarRecord {
+  id: string;
+  userId: string;
+  userName: string;
+  type: TimeEntryType;
+  timestamp: Date;
+  location: { lat: number; lng: number };
+  validated: boolean;
+}
+
 interface HistoryCalendarProps {
-  records: TimeRecord[];
+  records: CalendarRecord[];
   view: 'week' | 'month';
 }
 
 type DayStatus = 'ok' | 'error' | 'pending' | 'empty' | 'future';
-
-const ENTRY = 1;
-const EXIT = 2;
-
-const typeLabels: Record<TimeRecordType, string> = {
-  1: 'Entrada',
-  2: 'Saída',
-};
 
 const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const weekDaysFull = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -28,49 +30,36 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Get records grouped by date
   const recordsByDate = useMemo(() => {
-    const grouped: Record<string, TimeRecord[]> = {};
+    const grouped: Record<string, CalendarRecord[]> = {};
     records.forEach(record => {
       const dateKey = record.timestamp.toISOString().split('T')[0];
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
-      }
+      if (!grouped[dateKey]) grouped[dateKey] = [];
       grouped[dateKey].push(record);
     });
     return grouped;
   }, [records]);
 
-  // Get day status
   const getDayStatus = (date: Date): DayStatus => {
     const dateKey = date.toISOString().split('T')[0];
     const dayRecords = recordsByDate[dateKey];
-    
     const dateOnly = new Date(date);
     dateOnly.setHours(0, 0, 0, 0);
-    
     if (dateOnly > today) return 'future';
     if (!dayRecords || dayRecords.length === 0) return 'empty';
-    
-    // Check if any record has validation error
     const hasError = dayRecords.some(r => !r.validated);
     if (hasError) return 'error';
-    
-    // Check if it's today and incomplete
     if (dateOnly.getTime() === today.getTime()) {
-      const hasEntry = dayRecords.some(r => r.type === ENTRY);
-      const hasExit = dayRecords.some(r => r.type === EXIT);
+      const hasEntry = dayRecords.some(r => r.type === TimeEntryType.Entry);
+      const hasExit = dayRecords.some(r => r.type === TimeEntryType.Exit);
       if (hasEntry && !hasExit) return 'pending';
     }
-    
     return 'ok';
   };
 
-  // Generate week days
   const getWeekDays = () => {
     const startOfWeek = new Date(currentDate);
     startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-    
     const days: Date[] = [];
     for (let i = 0; i < 7; i++) {
       const day = new Date(startOfWeek);
@@ -80,51 +69,32 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
     return days;
   };
 
-  // Generate month days
   const getMonthDays = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    
     const days: (Date | null)[] = [];
-    
-    // Add empty slots for days before the first day of month
-    for (let i = 0; i < firstDay.getDay(); i++) {
-      days.push(null);
-    }
-    
-    // Add all days of the month
-    for (let i = 1; i <= lastDay.getDate(); i++) {
-      days.push(new Date(year, month, i));
-    }
-    
+    for (let i = 0; i < firstDay.getDay(); i++) days.push(null);
+    for (let i = 1; i <= lastDay.getDate(); i++) days.push(new Date(year, month, i));
     return days;
   };
 
   const navigatePrevious = () => {
     const newDate = new Date(currentDate);
-    if (view === 'week') {
-      newDate.setDate(newDate.getDate() - 7);
-    } else {
-      newDate.setMonth(newDate.getMonth() - 1);
-    }
+    if (view === 'week') newDate.setDate(newDate.getDate() - 7);
+    else newDate.setMonth(newDate.getMonth() - 1);
     setCurrentDate(newDate);
   };
 
   const navigateNext = () => {
     const newDate = new Date(currentDate);
-    if (view === 'week') {
-      newDate.setDate(newDate.getDate() + 7);
-    } else {
-      newDate.setMonth(newDate.getMonth() + 1);
-    }
+    if (view === 'week') newDate.setDate(newDate.getDate() + 7);
+    else newDate.setMonth(newDate.getMonth() + 1);
     setCurrentDate(newDate);
   };
 
-  const formatMonthYear = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-  };
+  const formatMonthYear = (date: Date) => date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
   const formatWeekRange = (days: Date[]) => {
     const start = days[0].toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
@@ -132,9 +102,7 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
     return `${start} - ${end}`;
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  };
+  const formatTime = (date: Date) => date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   const getSelectedDayRecords = () => {
     if (!selectedDate) return [];
@@ -160,16 +128,6 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
     return d.getTime() === s.getTime();
   };
 
-  /** Derive a display label based on position in the day's sequence */
-  const getRecordLabel = (record: TimeRecord, dayRecords: TimeRecord[]): string => {
-    const sorted = [...dayRecords].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-    const index = sorted.findIndex(r => r.id === record.id);
-    // Typical 4-punch day: Entry, Break Start, Break End, Exit
-    const labels = ['Entrada', 'Início Intervalo', 'Fim Intervalo', 'Saída'];
-    if (index >= 0 && index < labels.length) return labels[index];
-    return typeLabels[record.type];
-  };
-
   return (
     <div className="history-calendar">
       <div className="calendar-header">
@@ -190,9 +148,8 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
             const status = getDayStatus(day);
             const dateKey = day.toISOString().split('T')[0];
             const dayRecords = recordsByDate[dateKey] || [];
-            
             return (
-              <div 
+              <div
                 key={index}
                 className={`week-day-block ${status} ${isToday(day) ? 'today' : ''} ${isSelected(day) ? 'selected' : ''}`}
                 onClick={() => setSelectedDate(day)}
@@ -207,7 +164,7 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
                       {dayRecords.slice(0, 2).map((record, i) => (
                         <div key={i} className="week-day-record-item">
                           <span className="record-type-dot"></span>
-                          <span>{getRecordLabel(record, dayRecords)}</span>
+                          <span>{timeEntryTypeLabels[record.type]}</span>
                           <span className="record-time">{formatTime(record.timestamp)}</span>
                         </div>
                       ))}
@@ -219,16 +176,8 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
                     <span className="week-day-empty">Sem registros</span>
                   )}
                 </div>
-                {status === 'error' && (
-                  <div className="week-day-status-indicator error">
-                    <XCircle size={14} />
-                  </div>
-                )}
-                {status === 'pending' && (
-                  <div className="week-day-status-indicator pending">
-                    <Clock size={14} />
-                  </div>
-                )}
+                {status === 'error' && <div className="week-day-status-indicator error"><XCircle size={14} /></div>}
+                {status === 'pending' && <div className="week-day-status-indicator pending"><Clock size={14} /></div>}
               </div>
             );
           })}
@@ -244,14 +193,10 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
           </div>
           <div className="month-grid">
             {monthDaysData.map((day, index) => {
-              if (!day) {
-                return <div key={index} className="month-day empty-slot"></div>;
-              }
-              
+              if (!day) return <div key={index} className="month-day empty-slot"></div>;
               const status = getDayStatus(day);
-              
               return (
-                <div 
+                <div
                   key={index}
                   className={`month-day ${status} ${isToday(day) ? 'today' : ''} ${isSelected(day) ? 'selected' : ''}`}
                   onClick={() => setSelectedDate(day)}
@@ -267,20 +212,13 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
         </div>
       )}
 
-      {/* Detail Panel */}
       {selectedDate && (
         <div className="calendar-detail-panel">
           <div className="detail-panel-header">
             <h3 className="detail-panel-title">
-              {selectedDate.toLocaleDateString('pt-BR', { 
-                weekday: 'long', 
-                day: 'numeric', 
-                month: 'long' 
-              })}
+              {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
             </h3>
-            <button className="detail-panel-close" onClick={() => setSelectedDate(null)}>
-              ×
-            </button>
+            <button className="detail-panel-close" onClick={() => setSelectedDate(null)}>×</button>
           </div>
           <div className="detail-panel-content">
             {getSelectedDayRecords().length === 0 ? (
@@ -290,31 +228,27 @@ export default function HistoryCalendar({ records, view }: HistoryCalendarProps)
               </div>
             ) : (
               <div className="detail-panel-records">
-                {getSelectedDayRecords().map((record, index) => {
-                  const dayRecords = getSelectedDayRecords();
-                  const label = getRecordLabel(record, dayRecords);
-                  return (
-                    <div 
-                      key={record.id} 
-                      className={`detail-record-card type-${record.type}`}
-                      style={{ animationDelay: `${index * 0.05}s` }}
-                    >
-                      <div className={`detail-record-icon type-${record.type}`}>
-                        <Clock size={16} />
-                      </div>
-                      <div className="detail-record-info">
-                        <span className="detail-record-type">{label}</span>
-                        <span className="detail-record-time">{formatTime(record.timestamp)}</span>
-                      </div>
-                      {!record.validated && (
-                        <span className="detail-record-badge error">
-                          <XCircle size={12} />
-                          Erro
-                        </span>
-                      )}
+                {getSelectedDayRecords().map((record, index) => (
+                  <div
+                    key={record.id}
+                    className={`detail-record-card type-${record.type}`}
+                    style={{ animationDelay: `${index * 0.05}s` }}
+                  >
+                    <div className={`detail-record-icon type-${record.type}`}>
+                      <Clock size={16} />
                     </div>
-                  );
-                })}
+                    <div className="detail-record-info">
+                      <span className="detail-record-type">{timeEntryTypeLabels[record.type]}</span>
+                      <span className="detail-record-time">{formatTime(record.timestamp)}</span>
+                    </div>
+                    {!record.validated && (
+                      <span className="detail-record-badge error">
+                        <XCircle size={12} />
+                        Erro
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>

@@ -1,68 +1,57 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Clock, History, List, MapPin, Check, Briefcase, Timer, AlertCircle, CalendarDays, FileText, CheckCircle2, XCircle, Plus, LogIn, LogOut, Coffee, UtensilsCrossed } from 'lucide-react';
+import { Clock, History, List, MapPin, Check, Briefcase, Timer, AlertCircle, CalendarDays, FileText, CheckCircle2, XCircle, Plus, LogIn, LogOut, Coffee, UtensilsCrossed, Settings, Eye, EyeOff, Lock } from 'lucide-react';
 import Header from '@/components/Header/Header';
-import HistoryCalendar from '@/components/HistoryCalendar/HistoryCalendar';
+import HistoryCalendar, { CalendarRecord } from '@/components/HistoryCalendar/HistoryCalendar';
 import NewRequestModal, { DisplayRequest } from '@/components/NewRequestModal/NewRequestModal';
+import RequestDetailModal from '@/components/RequestDetailModal/RequestDetailModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { TimeRecord, TimeRecordType } from '@/types';
 import {
   timeEntriesApi,
   requestsApi,
   workSchedulesApi,
+  usersApi,
   TimeEntry,
+  TimeEntryType,
+  TimeEntryOrigin,
   RequestType,
   RequestStatus,
   WorkSchedule,
-  parseHoursTarget
+  calcScheduleHours,
+  requestTypeLabels,
+  requestStatusLabels,
+  timeEntryTypeLabels,
 } from '@/services/api';
 import { toast } from 'sonner';
 import './EmployeeDashboard.css';
 
-type TabType = 'ponto' | 'historico' | 'solicitacoes';
+type TabType = 'ponto' | 'historico' | 'solicitacoes' | 'conta';
 type PeriodFilter = 'day' | 'week' | 'month';
 
-const ENTRY: TimeRecordType = 1;
-const EXIT: TimeRecordType = 2;
-
-// UI clock step — the 4-step daily flow
-type ClockStep = 'entry' | 'break_start' | 'break_end' | 'exit';
+// UI clock step — the 4-step daily flow matching TimeEntryType
+type ClockStep = 'entry' | 'launch_time' | 'return_to_work' | 'exit';
 
 const stepLabels: Record<ClockStep, string> = {
   entry: 'Entrada',
-  break_start: 'Início Intervalo',
-  break_end: 'Fim Intervalo',
+  launch_time: 'Início Intervalo',
+  return_to_work: 'Fim Intervalo',
   exit: 'Saída',
 };
 
-const stepToApiType = (step: ClockStep): TimeRecordType =>
-  (step === 'entry' || step === 'break_end') ? ENTRY : EXIT;
-
-/** Derive a display label from a TimeRecord based on its position in the day */
-const getRecordLabel = (record: TimeRecord, dayRecords: TimeRecord[]): string => {
-  const sorted = [...dayRecords].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-  const index = sorted.findIndex(r => r.id === record.id);
-  const labels = ['Entrada', 'Início Intervalo', 'Fim Intervalo', 'Saída'];
-  if (index >= 0 && index < labels.length) return labels[index];
-  return record.type === ENTRY ? 'Entrada' : 'Saída';
-};
-
-const requestTypeLabels: Record<RequestType, string> = {
-  1: 'Esquecimento de Ponto',
-  2: 'Atestado Médico',
-  3: 'Férias',
-};
-
-const statusLabels: Record<RequestStatus, string> = {
-  0: 'Pendente',
-  1: 'Aprovado',
-  2: 'Rejeitado',
+const stepToApiType = (step: ClockStep): TimeEntryType => {
+  switch (step) {
+    case 'entry': return TimeEntryType.Entry;
+    case 'launch_time': return TimeEntryType.LaunchTime;
+    case 'return_to_work': return TimeEntryType.ReturnToWork;
+    case 'exit': return TimeEntryType.Exit;
+  }
 };
 
 const statusCssClass = (status: RequestStatus): string => {
-  return ['pending', 'approved', 'rejected'][status] || 'pending';
+  const map: Record<number, string> = { [RequestStatus.Pending]: 'pending', [RequestStatus.Accepted]: 'approved', [RequestStatus.Rejected]: 'rejected' };
+  return map[status] || 'pending';
 };
 
-const mapTimeEntryToRecord = (entry: TimeEntry, userName: string): TimeRecord => ({
+const mapTimeEntryToCalendarRecord = (entry: TimeEntry, userName: string): CalendarRecord => ({
   id: entry.id,
   userId: entry.userId,
   userName,
@@ -78,10 +67,11 @@ export default function EmployeeDashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [locationStatus, setLocationStatus] = useState<'checking' | 'success' | 'error'>('checking');
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [records, setRecords] = useState<TimeRecord[]>([]);
+  const [records, setRecords] = useState<CalendarRecord[]>([]);
   const [requests, setRequests] = useState<DisplayRequest[]>([]);
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('day');
   const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [schedule, setSchedule] = useState<WorkSchedule | null>(null);
 
@@ -114,7 +104,7 @@ export default function EmployeeDashboard() {
 
     try {
       const entries = await timeEntriesApi.getByUser(user.id);
-      setRecords(entries.map(e => mapTimeEntryToRecord(e, user.name)));
+      setRecords(entries.map(e => mapTimeEntryToCalendarRecord(e, user.name)));
     } catch (e) {
       console.error(e);
     }
@@ -127,8 +117,7 @@ export default function EmployeeDashboard() {
     }
 
     try {
-      // Try user-specific endpoint first, fallback to filtering pending
-      let userRequests: typeof requests = [];
+      let userRequests: DisplayRequest[] = [];
       try {
         const allUserReqs = await requestsApi.getByUser(user.id);
         userRequests = allUserReqs.map(r => ({
@@ -140,7 +129,6 @@ export default function EmployeeDashboard() {
           createdAt: r.createdAt ? new Date(r.createdAt) : undefined,
         }));
       } catch {
-        // Fallback: filter from pending
         const pending = await requestsApi.getPending();
         userRequests = pending
           .filter(r => r.requesterId === user.id)
@@ -187,25 +175,21 @@ export default function EmployeeDashboard() {
       .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   };
 
-  /** Determine the next clock step based on how many punches today */
   const getNextExpectedStep = (): ClockStep | null => {
     const todayCount = getTodayRecords().length;
-    const steps: ClockStep[] = ['entry', 'break_start', 'break_end', 'exit'];
+    const steps: ClockStep[] = ['entry', 'launch_time', 'return_to_work', 'exit'];
     if (todayCount >= steps.length) return null;
     return steps[todayCount];
   };
 
   const isStepCompleted = (step: ClockStep): boolean => {
-    const steps: ClockStep[] = ['entry', 'break_start', 'break_end', 'exit'];
-    const stepIndex = steps.indexOf(step);
-    return getTodayRecords().length > stepIndex;
+    const steps: ClockStep[] = ['entry', 'launch_time', 'return_to_work', 'exit'];
+    return getTodayRecords().length > steps.indexOf(step);
   };
 
   const isStepEnabled = (step: ClockStep): boolean => {
-    const steps: ClockStep[] = ['entry', 'break_start', 'break_end', 'exit'];
-    const stepIndex = steps.indexOf(step);
-    const todayCount = getTodayRecords().length;
-    return locationStatus === 'success' && todayCount === stepIndex;
+    const steps: ClockStep[] = ['entry', 'launch_time', 'return_to_work', 'exit'];
+    return locationStatus === 'success' && getTodayRecords().length === steps.indexOf(step);
   };
 
   const handleRegisterTime = async (step: ClockStep) => {
@@ -220,7 +204,7 @@ export default function EmployeeDashboard() {
       await timeEntriesApi.create({
         userId: user.id,
         type: apiType,
-        origin: 1, // WEB
+        origin: TimeEntryOrigin.Web,
         latitude: currentLocation.lat,
         longitude: currentLocation.lng,
       });
@@ -239,9 +223,23 @@ export default function EmployeeDashboard() {
       ]);
 
       toast.success(`${stepLabels[step]} registrada com sucesso`);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.error('Erro ao registrar ponto');
+      const msg = e?.message || '';
+      let parsed = '';
+      try { parsed = JSON.parse(msg)?.message || msg; } catch { parsed = msg; }
+
+      if (parsed.includes('Nenhum local de trabalho configurado')) {
+        toast.error('Seu local de trabalho ainda não foi configurado. Solicite ao administrador.');
+      } else if (parsed.includes('fora do local de trabalho permitido')) {
+        toast.error('Você está fora da área permitida para registrar ponto. Verifique sua localização.');
+      } else if (parsed.includes('Aguarde pelo menos')) {
+        toast.error('Aguarde pelo menos 1 minuto entre registros de ponto.');
+      } else if (parsed.includes('Jornada de 12h excedida')) {
+        toast.error('Jornada de 12h excedida. Procure seu gestor.');
+      } else {
+        toast.error(parsed || 'Erro ao registrar ponto');
+      }
     }
   };
 
@@ -276,14 +274,47 @@ export default function EmployeeDashboard() {
     await loadData();
   };
 
-  const scheduleHours = schedule ? parseHoursTarget(schedule.dailyHoursTarget) : 8;
+  const scheduleHours = schedule ? calcScheduleHours(schedule) : 8;
   const scheduleTolerance = schedule?.toleranceMinutes || 15;
   const scheduleName = schedule?.name || 'Horário Comercial';
+
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [showPasswords, setShowPasswords] = useState({ current: false, new: false, confirm: false });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!user) return;
+    if (!passwordForm.newPassword || !passwordForm.confirmPassword) {
+      toast.error('Preencha todos os campos');
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      toast.error('A nova senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('As senhas não coincidem');
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      await usersApi.update(user.id, { password: passwordForm.newPassword });
+      toast.success('Senha alterada com sucesso');
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err: any) {
+      console.error(err);
+      let msg = 'Erro ao alterar senha';
+      try { msg = JSON.parse(err.message)?.message || msg; } catch {}
+      toast.error(msg);
+    }
+    setIsChangingPassword(false);
+  };
 
   const tabs = [
     { id: 'ponto' as TabType, label: 'Ponto', icon: Clock },
     { id: 'historico' as TabType, label: 'Histórico', icon: History },
     { id: 'solicitacoes' as TabType, label: 'Solicitações', icon: List },
+    { id: 'conta' as TabType, label: 'Minha Conta', icon: Settings },
   ];
 
   return (
@@ -348,17 +379,17 @@ export default function EmployeeDashboard() {
                   Entrada
                 </button>
                 <button
-                  className={`clock-action-button break_start ${isStepCompleted('break_start') ? 'completed' : nextExpectedStep === 'break_start' ? 'suggested' : ''}`}
-                  onClick={() => handleRegisterTime('break_start')}
-                  disabled={!isStepEnabled('break_start')}
+                  className={`clock-action-button break_start ${isStepCompleted('launch_time') ? 'completed' : nextExpectedStep === 'launch_time' ? 'suggested' : ''}`}
+                  onClick={() => handleRegisterTime('launch_time')}
+                  disabled={!isStepEnabled('launch_time')}
                 >
                   <UtensilsCrossed size={18} />
                   Início Almoço
                 </button>
                 <button
-                  className={`clock-action-button break_end ${isStepCompleted('break_end') ? 'completed' : nextExpectedStep === 'break_end' ? 'suggested' : ''}`}
-                  onClick={() => handleRegisterTime('break_end')}
-                  disabled={!isStepEnabled('break_end')}
+                  className={`clock-action-button break_end ${isStepCompleted('return_to_work') ? 'completed' : nextExpectedStep === 'return_to_work' ? 'suggested' : ''}`}
+                  onClick={() => handleRegisterTime('return_to_work')}
+                  disabled={!isStepEnabled('return_to_work')}
                 >
                   <Coffee size={18} />
                   Fim Almoço
@@ -467,7 +498,7 @@ export default function EmployeeDashboard() {
                               </div>
                             </div>
                             <div className="history-card-content">
-                              <span className="history-type-label">{getRecordLabel(record, filteredRecords)}</span>
+                              <span className="history-type-label">{timeEntryTypeLabels[record.type]}</span>
                               <span className="history-time">{formatDateTime(record.timestamp)}</span>
                             </div>
                             <div className="history-card-right">
@@ -528,8 +559,9 @@ export default function EmployeeDashboard() {
                   return (
                     <div
                       key={request.id}
-                      className="request-card"
-                      style={{ animationDelay: `${index * 0.05}s` }}
+                      className="request-card clickable"
+                      style={{ animationDelay: `${index * 0.05}s`, cursor: 'pointer' }}
+                      onClick={() => setSelectedRequestId(request.id)}
                     >
                       <div className="request-card-left">
                         <div className="request-type-icon">
@@ -545,7 +577,7 @@ export default function EmployeeDashboard() {
                             {status === 'pending' && <Clock size={12} />}
                             {status === 'approved' && <CheckCircle2 size={12} />}
                             {status === 'rejected' && <XCircle size={12} />}
-                            {statusLabels[request.status] || 'Pendente'}
+                            {requestStatusLabels[request.status] || 'Pendente'}
                           </span>
                         </div>
                         <span className="request-card-description">{request.description}</span>
@@ -563,6 +595,71 @@ export default function EmployeeDashboard() {
             )}
           </div>
         )}
+
+        {activeTab === 'conta' && (
+          <div className="account-section">
+            <div className="section-header">
+              <h2 className="section-title">Minha Conta</h2>
+            </div>
+
+            <div className="account-card">
+              <div className="account-card-header">
+                <Lock size={20} />
+                <h3>Alterar Senha</h3>
+              </div>
+
+              <div className="account-form">
+                <div className="account-field">
+                  <label className="account-label">Nova Senha</label>
+                  <div className="account-input-wrapper">
+                    <input
+                      type={showPasswords.new ? 'text' : 'password'}
+                      className="account-input"
+                      placeholder="Digite a nova senha"
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      className="account-eye-btn"
+                      onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                    >
+                      {showPasswords.new ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="account-field">
+                  <label className="account-label">Confirmar Nova Senha</label>
+                  <div className="account-input-wrapper">
+                    <input
+                      type={showPasswords.confirm ? 'text' : 'password'}
+                      className="account-input"
+                      placeholder="Confirme a nova senha"
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      className="account-eye-btn"
+                      onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                    >
+                      {showPasswords.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  className="account-save-btn"
+                  onClick={handleChangePassword}
+                  disabled={isChangingPassword}
+                >
+                  {isChangingPassword ? 'Salvando...' : 'Alterar Senha'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       <NewRequestModal
@@ -570,6 +667,13 @@ export default function EmployeeDashboard() {
         onClose={() => setIsNewRequestModalOpen(false)}
         onSubmit={handleNewRequest}
         userId={user?.id || ''}
+      />
+
+      <RequestDetailModal
+        isOpen={!!selectedRequestId}
+        requestId={selectedRequestId}
+        onClose={() => setSelectedRequestId(null)}
+        onUpdated={loadData}
       />
     </div>
   );

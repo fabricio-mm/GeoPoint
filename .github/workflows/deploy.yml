@@ -1,0 +1,35 @@
+﻿name: Deploy to MonsterASP
+
+# O robô só vai trabalhar quando você fizer um push na branch main
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Baixa o seu código do GitHub pro computador virtual
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      # 2. Instala o .NET 8 no computador virtual
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # 3. Faz o "Build" apontando para a pasta correta da sua API
+      - name: Publicar Aplicação (Release)
+        run: dotnet publish ./GeoPointAPI/GeoPointAPI.sln -c Release -o ./publish_folder
+
+      # 4. Envia os arquivos gerados direto pra pasta wwwroot do MonsterASP
+      - name: Enviar para o Servidor via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./publish_folder/
+          server-dir: /wwwroot/

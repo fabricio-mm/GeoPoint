@@ -10,8 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configuração do Banco de Dados
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
-);
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<TokenService>();
 
@@ -36,7 +35,6 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddSingleton<GoogleDriveService>();
 
-// --- A CORREÇÃO ESTÁ AQUI ---
 // Configuramos o JSON para ignorar ciclos (loops) infinitos entre as tabelas
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -75,11 +73,19 @@ builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
-// Habilita o Swagger apenas em ambiente de Desenvolvimento
+// ============================================================
+// 🪄 AUTO-MIGRATION: A API constrói o banco de dados sozinha ao ligar
+// Isso dribla o firewall da rede e garante o banco sempre atualizado
+// ============================================================
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
 
+// Habilita o Swagger em todos os ambientes (Produção na Nuvem também)
 app.UseSwagger();
 app.UseSwaggerUI();
-
 
 app.UseHttpsRedirection();
 app.UseAuthentication();

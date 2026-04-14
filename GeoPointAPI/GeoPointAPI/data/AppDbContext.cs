@@ -17,82 +17,52 @@ public class AppDbContext : DbContext
     public DbSet<Attachment> Attachments { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
 
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
         // ============================================================
-        // 1. CONFIGURAÇÕES DE ENUMS (SALVAR COMO TEXTO) 📝
+        // 1. CONFIGURAÇÕES DE ENUMS E FILTROS 📝
         // ============================================================
-
-        // USER
-        modelBuilder.Entity<User>()
-            .Property(u => u.Role)
-            .HasConversion<string>();
-
-        modelBuilder.Entity<User>()
-            .Property(u => u.Status)
-            .HasConversion<string>();
 
         modelBuilder.Entity<Request>().HasQueryFilter(r => !r.IsDeleted);
         modelBuilder.Entity<Attachment>().HasQueryFilter(a => !a.IsDeleted);
-            base.OnModelCreating(modelBuilder);
 
-        // 👇 NOVOS: Para salvar "Manager" e "IT"
-        modelBuilder.Entity<User>()
-            .Property(u => u.JobTitle)
-            .HasConversion<string>();
+        modelBuilder.Entity<User>().Property(u => u.Role).HasConversion<string>();
+        modelBuilder.Entity<User>().Property(u => u.Status).HasConversion<string>();
+        modelBuilder.Entity<User>().Property(u => u.JobTitle).HasConversion<string>();
+        modelBuilder.Entity<User>().Property(u => u.Department).HasConversion<string>();
 
-        modelBuilder.Entity<User>()
-            .Property(u => u.Department)
-            .HasConversion<string>();
+        modelBuilder.Entity<WorkSchedule>().Property(w => w.Id).HasConversion<string>();
+        modelBuilder.Entity<Location>().Property(l => l.Type).HasConversion<string>();
+        modelBuilder.Entity<TimeEntry>().Property(te => te.Type).HasConversion<string>();
+        modelBuilder.Entity<TimeEntry>().Property(te => te.Origin).HasConversion<string>();
 
-        // WORK SCHEDULE (PK como String para FK ficar legível)
+        // 🪄 NOVO: Ensinando o SQL Server a salvar Arrays como Texto (CSV)
         modelBuilder.Entity<WorkSchedule>()
-            .Property(w => w.Id)
-            .HasConversion<string>();
-
-        // OUTROS ENUMS
-        modelBuilder.Entity<Location>()
-            .Property(l => l.Type)
-            .HasConversion<string>();
-
-        modelBuilder.Entity<TimeEntry>()
-            .Property(te => te.Type)
-            .HasConversion<string>();
-
-        modelBuilder.Entity<TimeEntry>()
-            .Property(te => te.Origin)
-            .HasConversion<string>();
+            .Property(w => w.WorkDays)
+            .HasConversion(
+                v => string.Join(',', v), // Salva no banco como "1,2,3,4,5"
+                v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToArray() // Lê do banco como Array de int
+            );
 
         // ============================================================
         // 2. PRECISÃO E TIPOS DE DADOS 🎯
         // ============================================================
 
-        modelBuilder.Entity<Location>()
-            .Property(l => l.Latitude)
-            .HasPrecision(10, 8);
+        modelBuilder.Entity<Location>().Property(l => l.Latitude).HasPrecision(10, 8);
+        modelBuilder.Entity<Location>().Property(l => l.Longitude).HasPrecision(11, 8);
+        modelBuilder.Entity<TimeEntry>().Property(te => te.LatitudeRecorded).HasPrecision(10, 8);
+        modelBuilder.Entity<TimeEntry>().Property(te => te.LongitudeRecorded).HasPrecision(11, 8);
 
-        modelBuilder.Entity<Location>()
-            .Property(l => l.Longitude)
-            .HasPrecision(11, 8);
-
-        modelBuilder.Entity<TimeEntry>()
-            .Property(te => te.LatitudeRecorded)
-            .HasPrecision(10, 8);
-
-        modelBuilder.Entity<TimeEntry>()
-            .Property(te => te.LongitudeRecorded)
-            .HasPrecision(11, 8);
-
+        // Ajustado para o padrão do SQL Server
         modelBuilder.Entity<TimeEntry>()
             .Property(t => t.TimestampUtc)
-            .HasColumnType("timestamptz"); // PostgreSQL Timestamp com Timezone
+            .HasColumnType("datetime2");
 
         modelBuilder.Entity<DailyBalance>()
             .Property(d => d.ReferenceDate)
-            .HasColumnType("date"); // Apenas data, sem hora
+            .HasColumnType("date");
 
         // ============================================================
         // 3. RELACIONAMENTOS (FOREIGN KEYS) 🔗
@@ -120,8 +90,6 @@ public class AppDbContext : DbContext
         // 4. SEEDING (DADOS INICIAIS) 🌱
         // ============================================================
 
-        // O EF Core vai converter os IDs (Enums) para String automaticamente
-        // graças à configuração .HasConversion<string>() feita acima.
         modelBuilder.Entity<WorkSchedule>().HasData(
             new WorkSchedule
             {
@@ -130,7 +98,7 @@ public class AppDbContext : DbContext
                 StartTime = new TimeSpan(8, 0, 0),
                 EndTime = new TimeSpan(18, 0, 0),
                 ToleranceMinutes = 10,
-                WorkDays = new [] { 1, 2, 3, 4, 5 } // Seg-Sex
+                WorkDays = new [] { 1, 2, 3, 4, 5 }
             },
             new WorkSchedule
             {

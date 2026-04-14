@@ -76,11 +76,10 @@ builder.Services.AddHttpClient();
 var app = builder.Build();
 
 // Habilita o Swagger apenas em ambiente de Desenvolvimento
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+
+app.UseSwagger();
+app.UseSwaggerUI();
+
 
 app.UseHttpsRedirection();
 app.UseAuthentication();

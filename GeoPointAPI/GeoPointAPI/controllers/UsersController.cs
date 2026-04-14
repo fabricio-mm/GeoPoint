@@ -73,31 +73,57 @@ public class UsersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateUserDto dto)
     {
-        // Aplica validações de integridade
-        var validation = await ValidateUserIntegrity(dto);
-        if (!validation.IsValid) return BadRequest(new { message = validation.Message });
-
-        if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
-            return BadRequest(new { message = "E-mail já cadastrado." });
-
-        var newUser = new User
+        try
         {
-            Id = Guid.NewGuid(),
-            FullName = dto.FullName,
-            Email = dto.Email,
-            Role = dto.Role,
-            Status = UserStatus.Active,
-            WorkScheduleId = dto.WorkScheduleId,
-            Password = ComputeHash(dto.Password),
-            Department = dto.Department,
-            JobTitle = dto.JobTitle
-        };
+            // 1. Validar se os Enums existem no sistema (Validação Rápida)
+            if (!Enum.IsDefined(typeof(UserRole), dto.Role))
+                return BadRequest(new { message = $"O valor de contrato (Role) '{dto.Role}' não existe." });
 
-        _context.Users.Add(newUser);
-        await _context.SaveChangesAsync();
+            if (!Enum.IsDefined(typeof(JobTitle), dto.JobTitle))
+                return BadRequest(new { message = $"O cargo (JobTitle) '{dto.JobTitle}' não existe." });
 
-        return CreatedAtAction(nameof(GetById), new { id = newUser.Id },
-            new { newUser.Id, newUser.FullName, newUser.Email, newUser.Role });
+            if (!Enum.IsDefined(typeof(Department), dto.Department))
+                return BadRequest(new { message = $"O departamento '{dto.Department}' não existe." });
+
+            // ⚠️ TEMPORARIAMENTE COMENTADO: Até você ter uma rota para criar WorkSchedules no banco!
+            // var validation = await ValidateUserIntegrity(dto);
+            // if (!validation.IsValid) return BadRequest(new { message = validation.Message });
+
+            // 3. Regra de Compliance: Estagiário não pode ser Gerente
+            if (dto.Role == UserRole.Intern && dto.JobTitle == JobTitle.Manager)
+                return BadRequest(new { message = "Violação de hierarquia: Um estagiário não pode ocupar o cargo de Gerente." });
+
+            if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
+                return BadRequest(new { message = "E-mail já cadastrado." });
+
+            var newUser = new User
+            {
+                Id = Guid.NewGuid(),
+                FullName = dto.FullName,
+                Email = dto.Email,
+                Role = dto.Role,
+                Status = UserStatus.Active,
+                WorkScheduleId = dto.WorkScheduleId,
+                Password = ComputeHash(dto.Password),
+                Department = dto.Department,
+                JobTitle = dto.JobTitle
+            };
+
+            _context.Users.Add(newUser);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetById), new { id = newUser.Id },
+                new { newUser.Id, newUser.FullName, newUser.Email, newUser.Role });
+        }
+        catch (Exception ex)
+        {
+            // O SORO DA VERDADE: Mostra o erro real se a conexão com o banco falhar!
+            return StatusCode(500, new {
+                erro = "Falha interna no servidor.",
+                detalhePrincipal = ex.Message,
+                detalheInterno = ex.InnerException?.Message
+            });
+        }
     }
 
     [HttpPost("bulk")]

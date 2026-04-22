@@ -71,8 +71,22 @@ builder.Services.AddSwaggerGen(c =>
 });
 builder.Services.AddHttpClient();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontEndPolicy", policy =>
+    {
+        policy.WithOrigins(
+                "https://geo-point-neon.vercel.app/",
+                "http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
 
+
+app.UseCors("FrontEndPolicy");
 // ============================================================
 // 🪄 AUTO-MIGRATION: A API constrói o banco de dados sozinha ao ligar
 // Isso dribla o firewall da rede e garante o banco sempre atualizado

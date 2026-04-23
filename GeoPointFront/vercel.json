@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "http://geopoint-api.runasp.net/api/$1"
+      "destination": "https://geopoint-api.runasp.net/api/$1"
     },
     {
       "source": "/(.*)",

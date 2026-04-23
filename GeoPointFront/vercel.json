@@ -1,0 +1,8 @@
+﻿{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "http://geopoint-api.runasp.net/api/:path*"
+    }
+  ]
+}
